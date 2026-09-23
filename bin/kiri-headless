@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Run KiRI without opening a browser, with the options used on WSL:
+#   -k         plot the layout with kicad-cli
+#   -S         start the web server without opening a browser
+#   -p PORT    use a fixed port (KIRI_PORT, default 8080) so the address stays the same
+#
+# Any other options and the project file are passed on to kiri, for example:
+#   kiri-headless my_board.kicad_pro
+#   kiri-headless -r my_board.kicad_pro
+
+exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/kiri" -k -S -p "${KIRI_PORT:-8080}" "${@}"

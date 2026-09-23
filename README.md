@@ -12,6 +12,7 @@ Millspaw Electronics uses KiRI on KiCad 10 projects that are stored on Windows a
 - **KiCad text variables in the page header.** The web page header shows the schematic and PCB title, revision and date copied straight from the title block. Projects that use KiCad text variables, such as `${PROJECT_TITLE}`, showed the variable names. The fork fills in the values from the project's `.kicad_pro`, including variables that contain other variables. It also strips the stray carriage return that CRLF files left at the end of each value.
 - **Quieter output on the Windows drive.** Running on a project under `/mnt/c` in WSL, upstream printed a harmless `tar: … Cannot utime` or `sed: preserving permissions` warning for nearly every file. The fork no longer triggers or shows them.
 - **Install scripts** (`install_kiri.sh`, `install_dependencies.sh`, `INSTALL.md`) download from this fork instead of upstream.
+- **`kiri-headless`** runs `kiri -k -S -p 8080`: plot layouts with `kicad-cli`, start the web server without opening a browser, and keep the same address. It passes any other options through, for example `kiri-headless -r board.kicad_pro`.
 
 To pull in upstream changes:
 
