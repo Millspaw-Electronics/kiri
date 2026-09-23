@@ -650,7 +650,10 @@ show_help()
 	     -f|--page-frame  Disable page frame for PCB
 	     -k|--kicad-cli   Force kicad-cli to plot layout
 
-	     -d|--output-dir  Change output folder path/name
+	     -d|--output-dir  Change output folder path/name. By default it is
+	                      ~/.cache/kiri/<project>-<id>, outside the project, so
+	                      it doesn't show up as changes in Git. Use -d .kiri to
+	                      keep it in the project folder instead.
 	     -r|--remove      Remove generated folder before running it
 	     -x|--archive     Archive generate files
 
@@ -761,9 +764,24 @@ get_project_nested_path()
 	dirname "${KICAD_PRO_ABSOLUTE_PATH#"${REPO_ABSOLUTE_PATH}"/}"
 }
 
+default_output_dir()
+{
+	# Keep generated files outside the project, so they don't show up as
+	# changes in Git: ~/.cache/kiri/<project>-<id>. The id is a checksum of
+	# the project's full path, so different clones of a project don't mix.
+	local cache_dir="${XDG_CACHE_HOME:-${HOME}/.cache}/kiri"
+	local project_name
+	local project_id
+
+	project_name="$(basename "${KICAD_PRO_ABSOLUTE_PATH%.*}")"
+	project_id="$(printf "%s" "${KICAD_PRO_ABSOLUTE_PATH}" | cksum | cut -d " " -f 1)"
+
+	echo "${cache_dir}/${project_name}-${project_id}"
+}
+
 command_line_parse()
 {
-	local output_dir=".kiri"
+	local output_dir=""
 
 	cmd_bkp="$(basename $0) $*"
 
@@ -980,13 +998,11 @@ command_line_parse()
 	readonly KICAD_PROJ_ABSOLUTE_PATH="${REPO_ABSOLUTE_PATH}/${KICAD_PROJ_NESTED_PATH}"
 	cd "${KICAD_PROJ_ABSOLUTE_PATH}" || exit
 
-	if [[ -n ${output_dir} ]]; then
-		readonly OUTPUT_DIR_PATH=$(realpath "${output_dir}")
-		mkdir -p "${OUTPUT_DIR_PATH}"
-	else
-		printf "ERROR: Output folder is empty\n"
-		exit 1
+	if [[ -z ${output_dir} ]]; then
+		output_dir="$(default_output_dir)"
 	fi
+	mkdir -p "${output_dir}"
+	readonly OUTPUT_DIR_PATH=$(realpath "${output_dir}")
 
 	if [[ -z ${IP_ADDRESS} ]]; then
 		readonly IP_ADDRESS="127.0.0.1"
@@ -2469,10 +2485,10 @@ update_svg_viewport()
 
 	# This one is needed only once since it is always the same
 	if [[ "${i}" == "2" ]]; then
-		find ".kiri/${commit_hash_1}/_KIRI_/${view}" -name "*.svg" -exec svg_tweaks {} ${x} ${y} \; > /dev/null
+		find "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/${view}" -name "*.svg" -exec svg_tweaks {} ${x} ${y} \; > /dev/null
 	fi
 
-	find ".kiri/${commit_hash_2}/_KIRI_/${view}" -name "*.svg" -exec svg_tweaks {} ${x} ${y} \; > /dev/null
+	find "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/${view}" -name "*.svg" -exec svg_tweaks {} ${x} ${y} \; > /dev/null
 }
 
 resolve_kicad_text_vars()
@@ -2620,8 +2636,8 @@ build_main_html()
 	sed -i "s|\[SCH_DATE\]|${sch_date}|g" "${WEB_DIR_PATH}/${main_html}"
 
 	# Initial Kicad project path
-	local project_path_1="$(realpath --relative-to="${KICAD_PROJ_ABSOLUTE_PATH}" "${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_proj_name}.${kicad_pro_extension}")"
-	local project_path_2="$(realpath --relative-to="${KICAD_PROJ_ABSOLUTE_PATH}" "${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_proj_name}.${kicad_pro_extension}")"
+	local project_path_1="${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_proj_name}.${kicad_pro_extension}"
+	local project_path_2="${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_proj_name}.${kicad_pro_extension}"
 	echo -e "\n${LBL}${LBL}Kiri main page${RCO}"
 	echo "- Initial project path:"
 	echo "  Pro 1: ${BTE}${LMA}${project_path_1}${RCO}"
@@ -2823,9 +2839,10 @@ main()
 
 	show_project_files "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}" "${kicad_cache_lib}"
 
+	echo -e "\n${LBL}Output folder:${RCO} ${OUTPUT_DIR_PATH}"
+
 	rm -rf "${OUTPUT_DIR_PATH}/_local_"
 	if [[ "${REMOVE_KIRI_FOLDER}" == 1 ]]; then
-		echo -e "\n${LBL}Output folder:${RCO} $(realpath --relative-to="${KICAD_PROJ_ABSOLUTE_PATH}" "${OUTPUT_DIR_PATH}")"
 		echo -e "${LRE}Removing leftovers from the previous run${RCO}"
 		rm -rf "${OUTPUT_DIR_PATH}"
 	fi
