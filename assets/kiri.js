@@ -208,16 +208,16 @@ function reset_commits_selection()
     $("#commit1_legend_text").css('visibility', 'visible');
     $("#commit1_legend_fs").css('visibility', 'visible');
     $("#commit1_legend_text_fs").css('visibility', 'visible');
-    $("#commit1_legend").css('color', '#00FFFF');
-    $("#commit1_legend_fs").css('color', '#00FFFF');
+    $("#commit1_legend").css('color', theme().newer_legend);
+    $("#commit1_legend_fs").css('color', theme().newer_legend);
 
     $("#diff-xlink-2").css('visibility', 'visible')
     $("#commit2_legend").css('visibility', 'visible');
     $("#commit2_legend_text").css('visibility', 'visible');
     $("#commit2_legend_fs").css('visibility', 'visible');
     $("#commit2_legend_text_fs").css('visibility', 'visible');
-    $("#commit2_legend").css('color', '#880808');
-    $("#commit2_legend_fs").css('color', '#880808');
+    $("#commit2_legend").css('color', theme().older_legend);
+    $("#commit2_legend_fs").css('color', theme().older_legend);
 
     $("#commit3_legend").css('visibility', 'visible');
     $("#commit3_legend_text").css('visibility', 'visible');
@@ -282,19 +282,21 @@ function toggle_old_commit_visibility()
         $("#commit2_legend_fs").css('visibility', 'visible');
         $("#commit2_legend_text_fs").css('visibility', 'visible');
 
-        $("#commit2_legend").css('color', '#a7a7a7');
-        $("#commit2_legend_fs").css('color', '#a7a7a7');
+        $("#commit2_legend").css('color', theme().single_legend);
+        $("#commit2_legend_fs").css('color', theme().single_legend);
     }
     else
     {
         $("#diff-xlink-1").css('filter', 'url(#filter-1)') /// FILTER_DEFAULT
         $("#diff-xlink-2").css('filter', 'url(#filter-2)') /// FILTER_DEFAULT
 
-        $("#commit1_legend").css('color', '#00FFFF');
-        $("#commit1_legend_fs").css('color', '#00FFFF');
-        $("#commit2_legend").css('color', '#880808');
-        $("#commit2_legend_fs").css('color', '#880808');
+        $("#commit1_legend").css('color', theme().newer_legend);
+        $("#commit1_legend_fs").css('color', theme().newer_legend);
+        $("#commit2_legend").css('color', theme().older_legend);
+        $("#commit2_legend_fs").css('color', theme().older_legend);
     }
+
+    apply_theme();
 }
 
 function toggle_new_commit_visibility()
@@ -338,19 +340,21 @@ function toggle_new_commit_visibility()
         $("#commit1_legend_fs").css('visibility', 'visible');
         $("#commit1_legend_text_fs").css('visibility', 'visible');
 
-        $("#commit1_legend").css('color', '#a7a7a7');
-        $("#commit1_legend_text_fs").css('color', '#a7a7a7');
+        $("#commit1_legend").css('color', theme().single_legend);
+        $("#commit1_legend_text_fs").css('color', theme().single_legend);
     }
     else
     {
         $("#diff-xlink-1").css('filter', 'url(#filter-1)') /// FILTER_DEFAULT
         $("#diff-xlink-2").css('filter', 'url(#filter-2)') /// FILTER_DEFAULT
 
-        $("#commit1_legend").css('color', '#00FFFF');
-        $("#commit1_legend_fs").css('color', '#00FFFF');
-        $("#commit2_legend").css('color', '#880808');
-        $("#commit2_legend_fs").css('color', '#880808');
+        $("#commit1_legend").css('color', theme().newer_legend);
+        $("#commit1_legend_fs").css('color', theme().newer_legend);
+        $("#commit2_legend").css('color', theme().older_legend);
+        $("#commit2_legend_fs").css('color', theme().older_legend);
     }
+
+    apply_theme();
 }
 
 function select_next_sch_or_pcb(cycle = false) {
@@ -480,6 +484,7 @@ Mousetrap.bind(['r', 'R'],  function(){reset_commits_selection()});
 
 // View
 Mousetrap.bind(['s', 'S'],  function(){toggle_sch_pcb_view()});
+Mousetrap.bind(['t', 'T'],  function(){toggle_theme()});
 
 Mousetrap.bind(['q', 'Q'],  function(){toggle_old_commit_visibility()});
 Mousetrap.bind(['w', 'W'],  function(){toggle_new_commit_visibility()});
@@ -1226,6 +1231,7 @@ function show_sch()
     $('#show_pcb').attr('checked', false);
 
     update_page(commit1, commit2);
+    apply_theme();
 }
 
 function show_pcb()
@@ -1253,6 +1259,7 @@ function show_pcb()
     $('#show_pcb').attr('checked', true);
 
     update_layer(commit1, commit2);
+    apply_theme();
 }
 
 // =======================================
@@ -1339,6 +1346,126 @@ function server_is_offline() {
 
 // ==================================================================
 
+// ==================================================================
+// Light/dark background for the drawing area
+// Each view keeps its own theme. The defaults match KiCad: a light
+// schematic and a dark layout. The SVGs are plotted black on transparent,
+// so each filter replaces the line colour with a constant colour.
+// ==================================================================
+
+var THEMES = {
+    light: {
+        background: "#F5F4EF",    // KiCad's default schematic background
+        blend: "multiply",         // unchanged lines (teal x red) come out black
+        newer: [0.0, 0.55, 0.55],  // #008C8C
+        older: [0.82, 0.0, 0.0],   // #D00000
+        single: [0.1, 0.1, 0.1],   // #1A1A1A
+        newer_legend: "#008C8C",
+        older_legend: "#D00000",
+        unchanged_legend: "#1A1A1A",
+        single_legend: "#1A1A1A",
+    },
+    dark: {
+        background: "#001023",    // KiCad's default layout background
+        blend: "screen",           // unchanged lines (cyan + red) come out white
+        newer: [0.0, 1.0, 1.0],    // #00FFFF
+        older: [1.0, 0.0, 0.0],    // #FF0000
+        single: [1.0, 1.0, 1.0],   // #FFFFFF
+        newer_legend: "#00FFFF",
+        older_legend: "#FF0000",
+        unchanged_legend: "#FFFFFF",
+        single_legend: "#FFFFFF",
+    },
+};
+
+var view_themes = { show_sch: "light", show_pcb: "dark" };
+
+try {
+    var saved_themes = JSON.parse(localStorage.getItem("kiri_view_themes"));
+    if (saved_themes) {
+        for (var view in view_themes) {
+            if (THEMES[saved_themes[view]]) {
+                view_themes[view] = saved_themes[view];
+            }
+        }
+    }
+} catch (e) {}
+
+function theme_view()
+{
+    // Read the radio buttons, since current_view can lag behind a view switch
+    var view = $('#view_mode input[name="view_mode"]:checked').val() || current_view;
+    return (view == "show_pcb") ? "show_pcb" : "show_sch";
+}
+
+function theme()
+{
+    return THEMES[view_themes[theme_view()]];
+}
+
+function theme_color_matrix(rgb)
+{
+    return "0.0  0.0  0.0  0.0  " + rgb[0] + "  " +
+           "0.0  0.0  0.0  0.0  " + rgb[1] + "  " +
+           "0.0  0.0  0.0  0.0  " + rgb[2] + "  " +
+           "0.0  0.0  0.0  1.0  0.0";
+}
+
+function set_legend_color(id, color)
+{
+    $("#" + id).css('color', color);
+    $("#" + id + "_fs").css('color', color);
+}
+
+function apply_theme()
+{
+    var t = theme();
+
+    var filters = [["filter-1", t.newer], ["filter-2", t.older], ["filter-12", t.single], ["filter-22", t.single]];
+    for (var i = 0; i < filters.length; i++) {
+        var matrix = document.querySelector("#" + filters[i][0] + " feColorMatrix");
+        if (matrix) {
+            matrix.setAttribute("values", theme_color_matrix(filters[i][1]));
+        }
+    }
+
+    var img_2 = document.getElementById("img-2");
+    if (img_2) {
+        img_2.style.mixBlendMode = t.blend;
+    }
+
+    $("#diff-container").css('background-color', t.background);
+    $("#svg-id").css('background-color', t.background);
+
+    if (current_diff_filter == "single") {
+        if ($("#diff-xlink-1").css('visibility') === "hidden") {
+            set_legend_color("commit2_legend", t.single_legend);
+        } else {
+            set_legend_color("commit1_legend", t.single_legend);
+        }
+    } else {
+        set_legend_color("commit1_legend", t.newer_legend);
+        set_legend_color("commit2_legend", t.older_legend);
+    }
+    set_legend_color("commit3_legend", t.unchanged_legend);
+
+    var dark = (view_themes[theme_view()] == "dark");
+    $("#theme-btn").attr('aria-pressed', dark ? 'true' : 'false');
+    $("#theme-btn").toggleClass('active', dark);
+}
+
+function toggle_theme()
+{
+    var view = theme_view();
+    view_themes[view] = (view_themes[view] == "dark") ? "light" : "dark";
+    try {
+        localStorage.setItem("kiri_view_themes", JSON.stringify(view_themes));
+    } catch (e) {}
+    apply_theme();
+}
+
+// ==================================================================
+
 function createNewEmbed(src1, src2)
 {
     console.log("createNewEmbed...");
@@ -1357,40 +1484,40 @@ function createNewEmbed(src1, src2)
       <g class="my_svg-pan-zoom_viewport">
           <svg id="img-1">
               <defs>
-                  <filter id="filter-1">
+                  <filter id="filter-1" color-interpolation-filters="sRGB">
                       <feColorMatrix in=SourceGraphic type="matrix"
-                      values="1.0  0.0  0.0  0.0  0.0
-                              0.0  1.0  0.0  1.0  0.0
-                              0.0  0.0  1.0  1.0  0.0
+                      values="0.0  0.0  0.0  0.0  0.0
+                              0.0  0.0  0.0  0.0  0.55
+                              0.0  0.0  0.0  0.0  0.55
                               0.0  0.0  0.0  1.0  0.0">
                   </filter>
-                  <filter id="filter-12">
+                  <filter id="filter-12" color-interpolation-filters="sRGB">
                       <feColorMatrix in=SourceGraphic type="matrix"
-                      values="-1.0   0.0   0.0  1.0  1.0
-                               0.0  -1.0   0.0  0.0  1.0
-                               0.0   0.0  -1.0  0.0  1.0
-                               0.0   0.0   0.0  0.6  0.0">
+                      values="0.0  0.0  0.0  0.0  0.1
+                              0.0  0.0  0.0  0.0  0.1
+                              0.0  0.0  0.0  0.0  0.1
+                              0.0  0.0  0.0  1.0  0.0">
                   </filter>
               </defs>
               <image id="diff-xlink-1" height="100%" width="100%" filter="url(#filter-1)"
                   onerror="this.onerror=null; imgError(this);"
                   href="${src1}" xlink:href="${src1}"/>
           </svg>
-          <svg id="img-2">
+          <svg id="img-2" style="mix-blend-mode: multiply;">
               <defs>
-                  <filter id="filter-2">
+                  <filter id="filter-2" color-interpolation-filters="sRGB">
                       <feColorMatrix in=SourceGraphic type="matrix"
-                      values="1.0  0.0  0.0  1.0  0.0
-                              0.0  1.0  0.0  0.0  0.0
-                              0.0  0.0  1.0  0.0  0.0
-                              0.0  0.0  0.0  0.5  0.0">
+                      values="0.0  0.0  0.0  0.0  0.82
+                              0.0  0.0  0.0  0.0  0.0
+                              0.0  0.0  0.0  0.0  0.0
+                              0.0  0.0  0.0  1.0  0.0">
                   </filter>
-                  <filter id="filter-22">
+                  <filter id="filter-22" color-interpolation-filters="sRGB">
                       <feColorMatrix in=SourceGraphic type="matrix"
-                      values="-1.0   0.0   0.0  1.0  1.0
-                               0.0  -1.0   0.0  0.0  1.0
-                               0.0   0.0  -1.0  0.0  1.0
-                               0.0   0.0   0.0  0.6  0.0">
+                      values="0.0  0.0  0.0  0.0  0.1
+                              0.0  0.0  0.0  0.0  0.1
+                              0.0  0.0  0.0  0.0  0.1
+                              0.0  0.0  0.0  1.0  0.0">
                   </filter>
               </defs>
               <image id="diff-xlink-2" height="100%" width="100%" filter="url(#filter-2)"
@@ -1403,6 +1530,7 @@ function createNewEmbed(src1, src2)
 
     document.getElementById('diff-container').replaceWith(embed);
     document.getElementById('diff-container').innerHTML = svg_element;
+    apply_theme();
     console.log(">>> SVG: ", embed);
 
     svgpanzoom_selector = "#svg-id";

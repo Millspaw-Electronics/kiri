@@ -84,6 +84,9 @@
 
 								<form class="inline" style="padding: 0px 0px 0px 0px; margin: 20px 0px 0px 20px;">
 									<div id="info_controls" class="form-group btn-group btn-group-toggle" role="group" aria-label="Info">
+										<button id="theme-btn" data-toggle="tooltip" title="Light/Dark Background (t)" name="info_controls" type="button" aria-pressed="false" class="btn btn-secondary" onclick="toggle_theme(); this.blur();">
+											<span class="iconify" style="width: 20px; height: 20px;" data-icon="mdi:theme-light-dark" data-inline="false"></span>
+										</button>
 										<button id="info-btn" data-toggle="modal" title="Info (i)" name="info_controls" type="button" aria-pressed="false" class="btn btn-secondary" data-target="#shortcuts-modal" onclick="this.blur();">
 											<span class="iconify" style="width: 20px; height: 20px;" data-icon="akar-icons:info" data-inline="false"></span>
 										</button>
@@ -97,7 +100,7 @@
 						<div class="col no-gutters" style="width: 100%; height: 90%; padding: 0px 0px 0px 0px; margin: 0px;">
 							<div id="legend" class="rounded no-gutters" style="background-color: #222; width: 100%; padding: 8px 5px 8px 5px; margin: 0px;">
 								<iframe name="hidden_post_target" class="hidden_iframe"></iframe>
-								<span id=commit1_legend style="margin-left:0.5em; margin-right:0.2em; color: #00FFFF; width: 10px; height: 10px;" class="iconify" data-icon="teenyicons-square-solid"></span>
+								<span id=commit1_legend style="margin-left:0.5em; margin-right:0.2em; color: #008C8C; width: 10px; height: 10px;" class="iconify" data-icon="teenyicons-square-solid"></span>
 								<small id="commit1_legend_text" class="text-sm text-light">
 									Newest
 									<span class="text-monospace">
@@ -109,7 +112,7 @@
 									</span>
 								</small>
 								<span style="display: inline; width: 2em;"></span>
-								<span id="commit2_legend" style="display: inline; margin-left:1em; margin-right:0.2em; color: #880808; width: 10px; height: 10px;" class="iconify" data-icon="teenyicons-square-solid"></span>
+								<span id="commit2_legend" style="display: inline; margin-left:1em; margin-right:0.2em; color: #D00000; width: 10px; height: 10px;" class="iconify" data-icon="teenyicons-square-solid"></span>
 								<small id="commit2_legend_text" class="text-sm text-light">
 									Oldest
 									<span class="text-monospace">
@@ -120,7 +123,7 @@
 										</form>
 									</span>
 								</small>
-								<span id="commit3_legend" style="margin-left:1em; margin-right:0.2em; color: #807F7F; width: 10px; height: 10px;" class="iconify" data-icon="teenyicons-square-solid"></span>
+								<span id="commit3_legend" style="margin-left:1em; margin-right:0.2em; color: #1A1A1A; width: 10px; height: 10px;" class="iconify" data-icon="teenyicons-square-solid"></span>
 								<small id="commit3_legend_text" class="text-sm text-light">
 									Unchanged
 								</small>
@@ -221,6 +224,10 @@
 							<tr>
 								<td class="shortcut_col"><small class="text-sm text-muted"><kbd>s</kbd></small></td>
 								<td>Switch Schematic/Layout view</td>
+							</tr>
+							<tr>
+								<td class="shortcut_col"><small class="text-sm text-muted"><kbd>t</kbd></small></td>
+								<td>Switch light/dark background for the current view</td>
 							</tr>
 							<tr>
 								<td class="shortcut_col"><small class="text-sm text-muted"><kbd>q</kbd></small></td>

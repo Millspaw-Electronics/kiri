@@ -144,14 +144,14 @@ html, body {
 #diff-container {
 /*	border: 1px solid #111;*/
 	margin-top: 15px;
-	background-color: #222;
+	background-color: #F5F4EF; /* KiCad's default schematic background */
 	border-radius: 5px;
 }
 
 #svg-id {
 /*	border: 1px solid #111;*/
 	margin-top: 15px;
-	background-color: #222;
+	background-color: #F5F4EF; /* KiCad's default schematic background */
 	border-radius: 5px;
 }
 
@@ -339,4 +339,9 @@ hr {
 	background-color: white;
 	height: 1px;
 	border: 0;
+}
+
+/* Light outline so the dark legend swatches stay visible on the dark header */
+[id^="commit"][id$="_legend"], [id^="commit"][id$="_legend_fs"] {
+	filter: drop-shadow(0 0 1px #DDDDDD);
 }
