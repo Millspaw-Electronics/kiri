@@ -23,6 +23,19 @@ if [[ -n "${SUPER_DEBUG_EXIT_ON_ERROR}" ]]; then
 	set -xe
 fi
 
+html_escape()
+{
+	# Escape text for use in HTML content and attribute values. Backslashes are
+	# escaped too, because the commits list is later passed through echo -e.
+	printf "%s" "${1}" | sed \
+		-e 's/&/\&amp;/g' \
+		-e 's/</\&lt;/g' \
+		-e 's/>/\&gt;/g' \
+		-e 's/"/\&quot;/g' \
+		-e "s/'/\&#39;/g" \
+		-e 's/\\/\&#92;/g'
+}
+
 insert_commits_html()
 {
 	# GIT COMMITS FORMAT
@@ -49,7 +62,7 @@ insert_commits_html()
 		local hash=$(echo "${commit}" | cut -d'|' -f1 | sed "s/^ //g" | sed "s/[ t]\+//g" )
 		local date=$(echo "${commit}" | cut -d'|' -f2 | cut -d' ' -f1-2 | sed "s/^ //g" )
 		local user=$(echo "${commit}" | cut -d'|' -f3 | sed "s/^ //g" )
-		local text=$(echo "${commit}" | cut -d'|' -f4 | sed "s/^ //g" )
+		local text=$(echo "${commit}" | cut -d'|' -f4- | sed "s/^ //g" )
 
 		local kicad_pro=$(get_kicad_pro "${OUTPUT_DIR_PATH}/${hash}")
 		local kicad_pro_extension=$(get_file_extension "${kicad_pro}")
@@ -118,7 +131,10 @@ insert_commits_html()
 		i=$((i + 1))
 
 		html_new_line="&#013;"
-		tooltip="<div>Commit: ${hash}</br>Date: ${date}</br>Author: ${user}</br>Description:</br>${text}</div>"
+		local user_html="$(html_escape "${user}")"
+		local text_html="$(html_escape "${text}")"
+		tooltip="<div>Commit: ${hash}</br>Date: ${date}</br>Author: ${user_html}</br>Description:</br>${text_html}</div>"
+		tooltip="$(html_escape "${tooltip}")"
 
 		read -r -d '' commit_html <<-EOM
 		<!-- Commit ${i} -->
@@ -132,12 +148,12 @@ insert_commits_html()
 		                </svg>
 		            </td>
 		            <td style="white-space:nowrap; overflow: hidden; text-overflow: ellipsis;">
-		                <span class="text-muted"> $(printf "%02d" ${i}) | </span> <span class="text-success font-weight-normal">${hash_label}</span> <span class="text-muted"> | </span> ${sch_icon} ${pcb_icon} ${txt_icon} <span class="text-muted font-weight-normal"> | ${date} | ${user}</span>
+		                <span class="text-muted"> $(printf "%02d" ${i}) | </span> <span class="text-success font-weight-normal">${hash_label}</span> <span class="text-muted"> | </span> ${sch_icon} ${pcb_icon} ${txt_icon} <span class="text-muted font-weight-normal"> | ${date} | ${user_html}</span>
 		            </td>
 		        </tr>
 		        <tr>
 		            <td>
-		                <em class="${class}" style=" line-height: 0.7;">${text}</em>
+		                <em class="${class}" style=" line-height: 0.7;">${text_html}</em>
 		            </td>
 		        </tr>
 		    </table>
