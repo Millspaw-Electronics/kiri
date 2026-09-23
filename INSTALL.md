@@ -1,101 +1,51 @@
+# Installing KiRI
 
-# Installing KiRI Dependencies
+One script installs KiRI's dependencies, KiCad (10.0 from KiCad's PPA on Ubuntu), KiRI itself and the KiCad plugin, and adds KiRI to your shell's `PATH`. Open a terminal and run:
 
-To install this tool on any Operating System, open a terminal and execute the following commands:
-
-> Windows users must use WSL/WSL2. See, [Windows preparation](#Windows-preparation) section.
-
-> MacOS users must have `homebrew`. See, [MacOS preparation](#MacOS-preparation) section for extra details.
-
-Installing (and reinstalling) dependencies:
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/Millspaw-Electronics/kiri/main/install_dependencies.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Millspaw-Electronics/kiri/main/install_kiri.sh)"
 ```
+
+It asks for your `sudo` password to install system packages. Run it again at any time to update KiRI. An existing installation is updated in place.
+
+When it finishes, open a new terminal and check the installation with `kiri -v`.
+
+> Windows users must use WSL2. See the [Windows preparation](#windows-preparation) section.
+
+> macOS users must have `homebrew`. See the [macOS preparation](#macos-preparation) section for extra details.
+
+## Options
+
+Set these environment variables in front of the command to change what the installer does, for example `KIRI_BRANCH=my-branch bash -c "$(curl ...)"`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KIRI_INSTALL_PATH` | `~/.local/share` | Folder to install into. KiRI goes in `${KIRI_INSTALL_PATH}/kiri`. |
+| `KIRI_BRANCH` | `main` | Branch to install. |
+| `KIRI_REPO` | `https://github.com/Millspaw-Electronics/kiri.git` | Repository to clone. |
+| `INSTALL_KIRI_REMOTELLY` | unset | When running `./install_kiri.sh` from a checkout, set this to clone from `KIRI_REPO` instead of installing the checkout. |
+| `KIRI_KICAD_PPA` | `ppa:kicad/kicad-10.0-releases` | KiCad PPA used on Ubuntu. Set it to an empty string to use the distribution's KiCad. |
+| `KIRI_SKIP_DEPENDENCIES` | unset | Set to `1` to skip installing system packages. |
+| `KIRI_WITH_PLOTGITSCH` | unset | Set to `1` to also build `plotgitsch` with `opam`. It is only needed for KiCad 5 schematics; KiCad 7 and later are plotted with `kicad-cli`. |
+
+The installer adds a block marked `# >>> kiri >>>` to `~/.bashrc` (and `~/.zshrc` if it exists) that sets `KIRI_HOME` and `PATH`. Re-running the installer updates that block rather than adding another.
 
 ## Windows Preparation
 
-[Configure WSL](https://www.tenforums.com/tutorials/46769-enable-disable-windows-subsystem-linux-wsl-windows-10-a.html)
-
-For `WSL1`, on a Powershell terminal with admin right, execute the following commands:
+In PowerShell with administrator rights, install WSL2 with Ubuntu, then reboot:
 
 ```powershell
-# Enable Windows Subsystem for Linux (using Power Shell)
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
-#Install-WindowsFeature -Name Microsoft-Windows-Subsystem-Linux
-
-# Install Ubuntu 20.04
-Invoke-WebRequest -Uri https://aka.ms/wsl-ubuntu-2004 -OutFile ~/Downloads/ubuntu-2004.zip
-New-Item -Path C:\ubuntu-2004 -ItemType Directory
-Expand-Archive -Path ~/Downloads/ubuntu-2004.zip C:\ubuntu-2004
-Set-Location C:\ubuntu-2004
-& .\ubuntu2004.exe
-```
-
-For `WSL2`, on a Powershell terminal with admin right, execute the following commands:
-```powershell
+wsl --install -d Ubuntu
 wsl --set-default-version 2
-wsl --install -d ubuntu
 ```
 
-Also, if Kicad 6 is installed, `xdotool` is used to plot schematics (`.kicad_sch`) and it requires a X Window System Server. Some of the alternatives include [Xming](https://sourceforge.net/projects/xming/), [Cygwin](https://x.cygwin.com/), and [Mobaterm](https://mobaxterm.mobatek.net/).
+Then run the installer above in the Ubuntu terminal. KiCad 7 and later are plotted with `kicad-cli`, so no X server is needed.
 
-## MacOS Preparation
+If KiCad 6 is installed, `xdotool` is used to plot schematics (`.kicad_sch`), and it requires an X Window System server. WSLg, which is included with current WSL2, provides one.
 
-After installing dependencies on macOS, if Kicad 6 is installed, it uses `cliclick` to plot schematics which needs `System Preferences → Security & Privacy → Accessibility` enabled for the Terminal.
+## macOS Preparation
 
-# Installing KiRI
-
-Installing (and reinstalling) KiRI:
-```bash
-bash -c "INSTALL_KIRI_REMOTELLY=1; \
-    $(curl -fsSL https://raw.githubusercontent.com/Millspaw-Electronics/kiri/main/install_kiri.sh)"
-```
-
-The following variables can be used to change the installation path and KiRI's branch, if needed.
-
-```bash
-# The default installation path is "${HOME}/.local/share"
-# It can be changed which the KIRI_INSTALL_PATH environment variable:
-export KIRI_INSTALL_PATH=${HOME}/.local/share
-
-# To test a different branch of Kiri, use the following environment variable:
-export KIRI_BRANCH=main
-```
-
-# Post-Installation
-
-Setup the environment using following commands.
-
-> Make sure `KIRI_HOME` is the right path to the installation folder
-
-```bash
-# KiRI Environment
-eval $(opam env)
-export KIRI_HOME=${HOME}/.local/share/kiri
-export PATH=${KIRI_HOME}/submodules/KiCad-Diff/bin:${PATH}
-export PATH=${KIRI_HOME}/bin:${PATH}
-```
-
-On Windows/WSL, it is needed to launch the XServer (e.g `Xming`) and also have the `DISPLAY` set correctly.
-Add the following lines in the end of the `~/.bashrc`, `~/.zshrc` to set DISPLAY.
-Also, launch `kicad` manually or any other GUI tool like `xeyes` to test if X11 is working.
-
-```bash
-# Set DISPLAY to use X terminal in WSL
-# In WSL2 the localhost and network interfaces are not the same than windows
-if grep -q "WSL2" /proc/version &> /dev/null; then
-    # execute route.exe in the windows to determine its IP address
-    export DISPLAY=$(route.exe print | grep 0.0.0.0 | head -1 | awk '{print $4}'):0.0
-
-else
-    # In WSL1 the DISPLAY can be the localhost address
-    if grep -qi "Microsoft" /proc/version &> /dev/null; then
-        export DISPLAY=127.0.0.1:0.0
-    fi
-
-fi
-```
+After installing, if KiCad 6 is installed, KiRI uses `cliclick` to plot schematics, which needs `System Preferences → Security & Privacy → Accessibility` enabled for the Terminal.
 
 # Docker
 
