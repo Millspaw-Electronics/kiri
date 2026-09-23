@@ -2026,6 +2026,98 @@ generate_schematic_artifacts()
 	# fi
 }
 
+kicad_cli_has_multi_mode()
+{
+	# kicad-cli can plot every layer in one run ("--mode-multi") since KiCad 9
+	if [[ -z "${KICAD_CLI_MULTI_MODE}" ]]; then
+		if kicad-cli pcb export svg --help 2>&1 | grep -q -- "--mode-multi"; then
+			KICAD_CLI_MULTI_MODE=1
+		else
+			KICAD_CLI_MULTI_MODE=0
+		fi
+	fi
+	[[ "${KICAD_CLI_MULTI_MODE}" == 1 ]]
+}
+
+plot_layout_with_kicad_cli()
+{
+	# Plot each layer of a commit's board to ${svg_dir}/layer-NN.svg, with the
+	# board outline (Edge.Cuts) on every layer
+	local commit_hash="${1}"
+	local kicad_pcb="${2}"
+	local svg_dir="${3}"
+
+	local pcb_path="${OUTPUT_DIR_PATH}/${commit_hash}/${kicad_pcb}"
+	local pcb_layers
+	local layers_name
+	local layer_name
+	local layer_id
+
+	pcb_layers=$(grep -P "^[ \t]+\([0-9][0-9]* " "${pcb_path}")
+	layers_name=$(echo "${pcb_layers}" | sed "s/\"//g" | sed "s/^[ \t]\+//g" | cut -d" " -f2)
+
+	if kicad_cli_has_multi_mode; then
+
+		# One kicad-cli run for all layers. Starting kicad-cli and loading the
+		# board takes most of the time, so this is much faster than one run
+		# per layer. It writes <board>-<layer>.svg, with "." in layer names
+		# replaced by "_", so rename the files to layer-NN.svg afterwards.
+		local multi_dir="${svg_dir}/.multi"
+		local board_name
+		local layers_list
+		local command_end="&> /dev/null"
+		if [[ "${DEBUG}" == 1 ]]; then
+			command_end=""
+		fi
+
+		board_name="$(basename "${kicad_pcb}" .kicad_pcb)"
+		layers_list="$(echo "${layers_name}" | paste -sd, -)"
+
+		rm -rf "${multi_dir}"
+		mkdir -p "${multi_dir}"
+
+		msg="# Plotting layout ${commit_hash}, ${kicad_pcb}"
+		cmd="kicad-cli pcb export svg --mode-multi --page-size-mode 0 --black-and-white --common-layers Edge.Cuts --layers \"${layers_list}\" --output \"${multi_dir}\" \"${pcb_path}\""
+		cmd_run "${cmd}" "${msg}" "${command_end}"
+
+		local layer_line
+		local file_name
+		for layer_name in ${layers_name[@]}; do
+			layer_line=$(echo "${pcb_layers}" | grep "\"${layer_name}\"" | head -n 1)
+			layer_id=$(echo "${layer_line}" | sed "s/[ \t]*(//g" | cut -d " " -f 1 | xargs printf "%02d")
+			# The file is named after the layer's display name, the last quoted
+			# name on its line, e.g. (9 "F.Adhes" user "F.Adhesive")
+			file_name=$(echo "${layer_line}" | sed -E 's/.*"([^"]+)"[^"]*$/\1/')
+			file_name="${board_name}-${file_name//./_}.svg"
+			if [[ -f "${multi_dir}/${file_name}" ]]; then
+				mv -f "${multi_dir}/${file_name}" "${svg_dir}/layer-${layer_id}.svg"
+			else
+				echo -e "    ${LRE}Layer ${layer_name} was not plotted for ${commit_hash}${RCO}" >&2
+			fi
+		done
+
+		rm -rf "${multi_dir}"
+
+	else
+
+		# Older kicad-cli: one run per layer, in the background
+		local command_end="&> /dev/null &"
+		if [[ "${DEBUG}" == 1 ]]; then
+			command_end="&"
+		fi
+
+		for layer_name in ${layers_name[@]}; do
+
+			layer_id=$(echo "${pcb_layers}" | grep "${layer_name}" | sed "s/[ \t]*(//g" | cut -d " " -f 1 | xargs printf "%02d")
+
+			msg="# Plotting layout ${commit_hash}, ${kicad_pcb} - ${layer_name}"
+			cmd="kicad-cli pcb export svg --page-size-mode 0 --black-and-white \"${pcb_path}\" --output \"${svg_dir}/layer-${layer_id}.svg\" --layers \"Edge.Cuts,${layer_name}\""
+			cmd_run "${cmd}" "${msg}" "${command_end}"
+
+		done
+	fi
+}
+
 generate_layout_artifacts()
 {
 	local commit_hash_1="${1}"
@@ -2056,35 +2148,10 @@ generate_layout_artifacts()
 
 		# This one is needed only once since it is always the same
 		if [[ "${i}" == "2" ]]; then
-
-			pcb_layers=$(grep -P "^[ \t]+\([0-9][0-9]* " ${OUTPUT_DIR_PATH}/${commit_hash_1}/"${kicad_pcb_1}")
-			layers_name=$(grep -P "^[ \t]+\([0-9][0-9]* " "${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_pcb_1}" | sed "s/\"//g" | sed "s/^[ \t]\+//g" | cut -d" " -f2)
-
-			for layer_name in ${layers_name[@]}; do
-
-				layer_id=$(echo "${pcb_layers}" | grep "${layer_name}" | sed "s/[ \t]*(//g" | cut -d " " -f 1 | xargs printf "%02d")
-
-				msg="# Plotting layout ${commit_hash_1}, ${kicad_pcb_1} - ${layer_name}"
-				cmd="kicad-cli pcb export svg --page-size-mode 0 --black-and-white \"${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_pcb_1}\" --output \"${SVG1_DIR_PATH}/layer-${layer_id}.svg\" --layers \"Edge.Cuts,${layer_name}\""
-				end="${command_end}"
-				cmd_run "${cmd}" "${msg}" "${end}"
-
-			done
+			plot_layout_with_kicad_cli "${commit_hash_1}" "${kicad_pcb_1}" "${SVG1_DIR_PATH}"
 		fi
 
-		pcb_layers=$(grep -P "^[ \t]+\([0-9][0-9]* " "${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_pcb_2}")
-		layers_name=$(grep -P "^[ \t]+\([0-9][0-9]* " "${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_pcb_2}" | sed "s/\"//g" | sed "s/^[ \t]\+//g" | cut -d" " -f2)
-
-		for layer_name in ${layers_name[@]}; do
-
-			layer_id=$(echo "${pcb_layers}" | grep "${layer_name}" | sed "s/[ \t]*(//g" | cut -d " " -f 1 | xargs printf "%02d")
-
-			msg="# Plotting layout ${commit_hash_2}, ${kicad_pcb_2} - ${layer_name}"
-			cmd="kicad-cli pcb export svg --page-size-mode 0 --black-and-white \"${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_pcb_2}\" --output \"${SVG2_DIR_PATH}/layer-${layer_id}.svg\" --layers \"Edge.Cuts,${layer_name}\""
-			end="${command_end}"
-			cmd_run "${cmd}" "${msg}" "${end}"
-
-		done
+		plot_layout_with_kicad_cli "${commit_hash_2}" "${kicad_pcb_2}" "${SVG2_DIR_PATH}"
 
 	else
 
