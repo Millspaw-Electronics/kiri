@@ -1474,20 +1474,20 @@ export_project_files()
 		| xargs -I '{}' sed -i 's/\r//' '{}' &> /dev/null
 
 	else
-		mkdir -p "${OUTPUT_DIR_PATH}/${commit_hash}"
-		git archive --format=tar ${commit_hash} | (cd "${OUTPUT_DIR_PATH}/${commit_hash}" && tar -m -xf -)
+		local archive_dir="${OUTPUT_DIR_PATH}/${commit_hash}"
+		mkdir -p "${archive_dir}"
+		git archive --format=tar ${commit_hash} | (cd "${archive_dir}" && tar -m -xf -)
 
 		# Convert lfs pointers to actual files
-		cd "${OUTPUT_DIR_PATH}/${commit_hash}"
-		for file in *
+		# Git commands run from the repo, since the output dir is not a git repository
+		local path file
+		for path in "${archive_dir}"/*
 		do
-			git check-attr -a ${file} | grep "filter: lfs" > /dev/null
-			if [ $? -eq 0 ]; then
-				cat ${file} > tmp; cat tmp | git lfs smudge > ${file}
+			file=$(basename "${path}")
+			if git check-attr filter -- "${file}" | grep -q "filter: lfs"; then
+				git lfs smudge -- "${file}" < "${path}" > "${path}.tmp" && mv "${path}.tmp" "${path}"
 			fi
 		done
-		rm -f tmp
-		cd - > /dev/null
 	fi
 }
 
