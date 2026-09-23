@@ -484,14 +484,31 @@ realpath()
 
 sed()
 {
+	local sed_cmd="sed"
+
 	case ${OSTYPE} in
 		darwin*)
-			gsed "$@"
-			;;
-		*)
-			command sed "$@"
+			sed_cmd="gsed"
 			;;
 	esac
+
+	# On the Windows drive in WSL, "sed -i" cannot copy the file's ownership and
+	# permissions to its temporary file, so it prints a "preserving permissions"
+	# warning on every edit even though the edit succeeds. Hide just that warning.
+	# (Check each argument, since KiRI changes IFS and "${*}" depends on it.)
+	local arg
+	local in_place=0
+	for arg in "$@"; do
+		if [[ "${arg}" == "-i" ]] || [[ "${arg}" == --in-place* ]]; then
+			in_place=1
+		fi
+	done
+
+	if [[ "${in_place}" == 1 ]]; then
+		command "${sed_cmd}" "$@" 2> >(grep -v "preserving permissions" >&2)
+	else
+		command "${sed_cmd}" "$@"
+	fi
 }
 
 tac()
@@ -1442,7 +1459,7 @@ export_project_files()
 
 	else
 		mkdir -p "${OUTPUT_DIR_PATH}/${commit_hash}"
-		git archive --format=tar ${commit_hash} | (cd "${OUTPUT_DIR_PATH}/${commit_hash}" && tar xf -)
+		git archive --format=tar ${commit_hash} | (cd "${OUTPUT_DIR_PATH}/${commit_hash}" && tar -m -xf -)
 
 		# Convert lfs pointers to actual files
 		cd "${OUTPUT_DIR_PATH}/${commit_hash}"
