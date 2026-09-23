@@ -1166,7 +1166,7 @@ get_git_commits()
 
 	if [[ "${ALL_COMMITS}" == "1" ]]; then
 
-		local cmd="git log --date=format:'%Y-%m-%d %H:%M:%S' --pretty='format:%h | %ad | %an | %s%d' ${current_git_branch} -- ${command_end}"
+		local cmd="git log --date=format:'%Y-%m-%d %H:%M:%S' --pretty='format:%h | %ad | %an | %s%d' ${KIRI_BRANCHES:---branches --remotes} -- ${command_end}"
 
 	else
 
@@ -1215,7 +1215,7 @@ get_git_commits()
 		# echo "${files_quotes[@]}" >&2
 		# echo "==================" >&2
 
-		local cmd="git log --date=format:'%Y-%m-%d %H:%M:%S' --pretty='format:%h | %ad | %an | %s%d' ${current_git_branch} -- ${files_quotes} ${command_end}"
+		local cmd="git log --date=format:'%Y-%m-%d %H:%M:%S' --pretty='format:%h | %ad | %an | %s%d' ${KIRI_BRANCHES:---branches --remotes} -- ${files_quotes} ${command_end}"
 	fi
 
 	if [[ "${VERBOSE}" = "1" ]] || [[ "${DEBUG}" == "1" ]]; then
@@ -1420,7 +1420,7 @@ export_project_files()
 		# Convert windows CRLF line-endings on local files if any
 		find "${OUTPUT_DIR_PATH}/_local_/" -type f \
 		| xargs file {} \; \
-		| grep -i "ASCII text.*CRLF" \
+		| grep -i "text.*CRLF" \
 		| cut -d: -f1 \
 		| xargs -I '{}' sed -i 's/\r//' '{}' &> /dev/null
 
@@ -2375,6 +2375,32 @@ update_svg_viewport()
 	find ".kiri/${commit_hash_2}/_KIRI_/${view}" -name "*.svg" -exec svg_tweaks {} ${x} ${y} \; > /dev/null
 }
 
+resolve_kicad_text_vars()
+{
+	# Expand KiCad ${VAR} text variables (including nested ones) using the
+	# text_variables table in the .kicad_pro, and drop any CR from CRLF files
+	local text="${1//$'\r'/}"
+	local kicad_pro="${2}"
+
+	python3 - "${kicad_pro}" "${text}" <<-'EOF' 2> /dev/null || printf "%s" "${text}"
+		import json, os, re, sys
+		kicad_pro, text = sys.argv[1], sys.argv[2]
+		try:
+		    with open(kicad_pro, encoding="utf-8") as f:
+		        variables = json.load(f).get("text_variables") or {}
+		except Exception:
+		    variables = {}
+		variables.setdefault("PROJECTNAME", os.path.splitext(os.path.basename(kicad_pro))[0])
+		pattern = re.compile(r"\$\{([^{}]+)\}")
+		for _ in range(10):
+		    expanded = pattern.sub(lambda m: str(variables.get(m.group(1), m.group(0))), text)
+		    if expanded == text:
+		        break
+		    text = expanded
+		print(text, end="")
+	EOF
+}
+
 build_main_html()
 {
 	local kicad_pro="$(get_kicad_pro "${KICAD_PROJ_ABSOLUTE_PATH}")"
@@ -2441,6 +2467,7 @@ build_main_html()
 	local _kicad_proj_name="$(get_file_without_extention "${_kicad_pro}")"
 	local _kicad_sch="$(get_kicad_sch "${KICAD_PROJ_ABSOLUTE_PATH}" "${_kicad_proj_name}" "${_kicad_pro_extension}")"
 	local _kicad_pcb="$(get_kicad_pcb "${KICAD_PROJ_ABSOLUTE_PATH}" "${_kicad_proj_name}")"
+	local _kicad_pro_path="${KICAD_PROJ_ABSOLUTE_PATH}/${_kicad_proj_name}.${_kicad_pro_extension}"
 
 	# Set Kicad project's name
 	echo "- Project's name (file name): ${BTE}${LBL}${_kicad_proj_name}${RCO}"
@@ -2449,9 +2476,11 @@ build_main_html()
 	# Set schematic and board titles
 	# local sch_title=$(grep -i "title " "${_kicad_sch}" -m1 2> /dev/null | sed "s/^[ \t]\+//g" | cut -d" " -f 2- | sed "s/[)\"]//g")
 	local sch_title=$(grep -i "title " -m1 "${_kicad_sch}" 2> /dev/null | sed "s/.*[Tt]itle //g" | cut -d")" -f1 | sed "s/\"//g")
+	sch_title="$(resolve_kicad_text_vars "${sch_title}" "${_kicad_pro_path}")"
 	local sch_label="${sch_title}"
 	# local pcb_title=$(grep -i "(title .*)" "${_kicad_pcb}" -m1 2> /dev/null | sed "s/^[ \t]\+//g" | cut -d" " -f 2- | sed "s/[)\"]//g")
 	local pcb_title=$(grep -i "(title " -m1 "${_kicad_pcb}" 2> /dev/null | sed "s/.*title //g" | cut -d")" -f1 | sed "s/\"//g")
+	pcb_title="$(resolve_kicad_text_vars "${pcb_title}" "${_kicad_pro_path}")"
 	local pcb_label="${pcb_title}"
 	if [[ -z "${sch_title}" ]]; then sch_title="[title]"; sch_label="${BTE}${LRE}[missing]${RCO}"; fi
 	if [[ -z "${pcb_title}" ]]; then pcb_title="[title]"; pcb_label="${BTE}${LRE}[missing]${RCO}"; fi
@@ -2463,9 +2492,11 @@ build_main_html()
 	# Set schematic and board revision
 	# local sch_revision=$(grep -i "Rev" "${_kicad_sch}" -m1 2> /dev/null | sed "s/^[ \t]\+//g" | sed "s/[()]//g" | cut -d" " -f2- | sed "s/\"//g")
 	local sch_revision=$(grep -i "rev " -m1 "${_kicad_sch}" 2> /dev/null | sed "s/.*[Rr]ev //g" | cut -d")" -f1 | sed "s/\"//g")
+	sch_revision="$(resolve_kicad_text_vars "${sch_revision}" "${_kicad_pro_path}")"
 	local sch_label="${sch_revision}"
 	# local pcb_revision=$(grep "(rev " "${_kicad_pcb}" -m1 2> /dev/null | sed "s/^[ \t]\+//g" | sed "s/[()]//g" | cut -d" " -f2- | sed "s/\"//g")
 	local pcb_revision=$(grep -i "(rev " -m1 "${_kicad_pcb}" 2> /dev/null | sed "s/.*rev //g" | cut -d")" -f1 | sed "s/\"//g")
+	pcb_revision="$(resolve_kicad_text_vars "${pcb_revision}" "${_kicad_pro_path}")"
 	local pcb_label="${pcb_revision}"
 	if [[ -z "${pcb_revision}" ]]; then pcb_revision="[rev]"; pcb_label="${BTE}${LRE}[missing]${RCO}"; fi
 	if [[ -z "${sch_revision}" ]]; then sch_revision="[rev]"; sch_label="${BTE}${LRE}[missing]${RCO}"; fi
@@ -2476,8 +2507,10 @@ build_main_html()
 
 	# Set schematic and board date
 	local sch_date=$(grep -i "date" "${_kicad_sch}" -m1 2> /dev/null | sed "s/^[ \t]\+//g" | sed "s/[()]//g" | cut -d" " -f2 | sed "s/\"//g")
+	sch_date="$(resolve_kicad_text_vars "${sch_date}" "${_kicad_pro_path}")"
 	local sch_label="${sch_date}"
 	local pcb_date=$(grep "(date " "${_kicad_pcb}" -m1 2> /dev/null | sed "s/^[ \t]\+//g" | sed "s/[()]//g" | cut -d" " -f2 | sed "s/\"//g")
+	pcb_date="$(resolve_kicad_text_vars "${pcb_date}" "${_kicad_pro_path}")"
 	local pcb_label="${pcb_date}"
 	if [[ -z "${sch_date}" ]]; then sch_date="[date]"; sch_label="${BTE}${LRE}[missing]${RCO}"; fi
 	if [[ -z "${pcb_date}" ]]; then pcb_date="[date]"; pcb_label="${BTE}${LRE}[missing]${RCO}"; fi
