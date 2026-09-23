@@ -9,7 +9,7 @@ To install this tool on any Operating System, open a terminal and execute the fo
 
 Installing (and reinstalling) dependencies:
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/leoheck/kiri/main/install_dependencies.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Millspaw-Electronics/kiri/main/install_dependencies.sh)"
 ```
 
 ## Windows Preparation
@@ -49,7 +49,7 @@ After installing dependencies on macOS, if Kicad 6 is installed, it uses `clicli
 Installing (and reinstalling) KiRI:
 ```bash
 bash -c "INSTALL_KIRI_REMOTELLY=1; \
-    $(curl -fsSL https://raw.githubusercontent.com/leoheck/kiri/main/install_kiri.sh)"
+    $(curl -fsSL https://raw.githubusercontent.com/Millspaw-Electronics/kiri/main/install_kiri.sh)"
 ```
 
 The following variables can be used to change the installation path and KiRI's branch, if needed.

@@ -228,7 +228,7 @@ install_python_modules()
 	if [[ -f "${KIRI_HOME}/python-requirements.txt" ]]; then
 		yes | pip3 install -r "${KIRI_HOME}/python-requirements.txt"
 	else
-		yes | pip3 install -r https://raw.githubusercontent.com/leoheck/kiri/main/python-requirements.txt
+		yes | pip3 install -r https://raw.githubusercontent.com/Millspaw-Electronics/kiri/main/python-requirements.txt
 	fi
 }
 

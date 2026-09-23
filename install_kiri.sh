@@ -24,7 +24,7 @@ install_kiri()
 
 		# Clone Kiri
 		if which git &> /dev/null; then
-			git clone --recurse-submodules -j8 https://github.com/leoheck/kiri.git "${KIRI_HOME}/kiri"
+			git clone --recurse-submodules -j8 https://github.com/Millspaw-Electronics/kiri.git "${KIRI_HOME}/kiri"
 			cd "${KIRI_HOME}/kiri/" || exit
 			git checkout ${KIRI_BRANCH}
 		else
@@ -54,7 +54,7 @@ install_plotgitsch()
 intall_kicad_plugin()
 {
 	if [[ -n "${INSTALL_KIRI_REMOTELLY}" ]]; then
-		local install_url="https://raw.githubusercontent.com/leoheck/kiri/main/install_plugin.sh"
+		local install_url="https://raw.githubusercontent.com/Millspaw-Electronics/kiri/main/install_plugin.sh"
 		bash -c "$(curl -fsSL ${install_url})" "" "${KIRI_HOME}/kiri/" > /dev/null
 	else	
 		./install_plugin.sh
