@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- Ship the web viewer next to the program, in an "assets" folder -->
+  <PropertyGroup>
+    <KiriAssets>$(MSBuildThisFileDirectory)..\assets\</KiriAssets>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="$(KiriAssets)index.html;$(KiriAssets)kiri.js;$(KiriAssets)kiri.css;$(KiriAssets)blank.svg;$(KiriAssets)favicon.ico;$(KiriAssets)redirect.html"
+             Link="assets\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(KiriAssets)vendor\**\*"
+             Link="assets\vendor\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

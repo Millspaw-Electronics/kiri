@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kiri.Core", "Kiri.Core\Kiri.Core.csproj", "{8F0DA6F4-6D60-490A-9BF4-4A48BAB6BD3E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kiri.Cli", "Kiri.Cli\Kiri.Cli.csproj", "{C1C3B5E1-2BE5-4BC3-9F10-991124566666}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kiri.App", "Kiri.App\Kiri.App.csproj", "{410605FC-F56A-4675-A5F8-767729580589}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8F0DA6F4-6D60-490A-9BF4-4A48BAB6BD3E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F0DA6F4-6D60-490A-9BF4-4A48BAB6BD3E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F0DA6F4-6D60-490A-9BF4-4A48BAB6BD3E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F0DA6F4-6D60-490A-9BF4-4A48BAB6BD3E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1C3B5E1-2BE5-4BC3-9F10-991124566666}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1C3B5E1-2BE5-4BC3-9F10-991124566666}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1C3B5E1-2BE5-4BC3-9F10-991124566666}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1C3B5E1-2BE5-4BC3-9F10-991124566666}.Release|Any CPU.Build.0 = Release|Any CPU
+		{410605FC-F56A-4675-A5F8-767729580589}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{410605FC-F56A-4675-A5F8-767729580589}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{410605FC-F56A-4675-A5F8-767729580589}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{410605FC-F56A-4675-A5F8-767729580589}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>kiri-cli</AssemblyName>
+    <RootNamespace>Kiri.Cli</RootNamespace>
+    <ApplicationIcon>..\..\assets\favicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kiri.Core\Kiri.Core.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Assets.props" />
+
+</Project>

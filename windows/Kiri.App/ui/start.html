@@ -1,0 +1,87 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>KiRI</title>
+	<link rel="stylesheet" href="bootstrap.min.css">
+	<link rel="stylesheet" href="start.css">
+</head>
+<body>
+	<main class="container">
+
+		<header class="d-flex align-items-center mb-4">
+			<img src="kiri.svg" alt="" width="56" height="56" class="mr-3">
+			<div>
+				<h1 class="h3 mb-0">KiCad Revision Inspector</h1>
+				<div class="text-muted small">Compare the schematics and layouts of every commit of a KiCad project</div>
+			</div>
+		</header>
+
+		<div id="error" class="alert alert-danger" role="alert" hidden>
+			<button type="button" class="close" aria-label="Close" onclick="hide('error')">&times;</button>
+			<pre id="error-text" class="mb-0"></pre>
+		</div>
+
+		<!-- Home: open a repository, recent projects, tools -->
+		<section id="home">
+			<div class="card mb-4">
+				<div class="card-body d-flex align-items-center justify-content-between">
+					<div>
+						<h2 class="h5 mb-1">Open a repository</h2>
+						<div class="text-muted small">Choose a folder with a Git repository that contains a KiCad <span class="kicad-min">9</span> (or newer) project.</div>
+					</div>
+					<button id="open-btn" class="btn btn-primary btn-lg" onclick="send({action: 'open_folder'})">Open Folder&hellip;</button>
+				</div>
+			</div>
+
+			<div id="recent-card" class="card mb-4" hidden>
+				<div class="card-header">Recent projects</div>
+				<ul id="recent" class="list-group list-group-flush"></ul>
+			</div>
+
+			<div class="card">
+				<div class="card-header">Tools</div>
+				<ul class="list-group list-group-flush">
+					<li class="list-group-item tool" id="tool-git"></li>
+					<li class="list-group-item tool" id="tool-kicad"></li>
+				</ul>
+			</div>
+		</section>
+
+		<!-- Several projects in the chosen folder -->
+		<section id="choose" hidden>
+			<div class="card">
+				<div class="card-header">This folder contains several KiCad projects. Which one do you want to inspect?</div>
+				<ul id="choose-list" class="list-group list-group-flush"></ul>
+				<div class="card-footer text-right">
+					<button class="btn btn-secondary" onclick="show('home')">Back</button>
+				</div>
+			</div>
+		</section>
+
+		<!-- Plotting progress -->
+		<section id="busy" hidden>
+			<div class="card">
+				<div class="card-body">
+					<h2 class="h5 mb-1">Plotting <span id="busy-project"></span></h2>
+					<div id="busy-folder" class="text-muted small mb-3"></div>
+					<div class="progress mb-3">
+						<div id="busy-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+					</div>
+					<pre id="busy-log" class="log"></pre>
+					<div class="text-right">
+						<button class="btn btn-secondary" onclick="send({action: 'cancel'})">Cancel</button>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<footer class="text-muted small mt-4">
+			KiRI <span id="version"></span> &middot; based on
+			<a href="#" onclick="send({action: 'open_url', url: 'https://github.com/leoheck/kiri'}); return false;">KiRI by Leandro Heck</a>
+		</footer>
+	</main>
+
+	<script src="start.js"></script>
+</body>
+</html>

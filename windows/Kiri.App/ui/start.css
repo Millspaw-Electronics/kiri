@@ -1,0 +1,126 @@
+/* Dark theme to match the viewer */
+body {
+	background-color: #333;
+	color: #eee;
+	padding: 40px 16px;
+	user-select: none;
+}
+
+main.container {
+	max-width: 820px;
+}
+
+.card {
+	background-color: #2a2a2a;
+	border-color: #444;
+}
+
+.card-header, .card-footer {
+	background-color: #262626;
+	border-color: #444;
+}
+
+.list-group-item {
+	background-color: transparent;
+	border-color: #444;
+	color: #eee;
+}
+
+.list-group-item-action:hover, .list-group-item-action:focus {
+	background-color: #3a3a3a;
+	color: #fff;
+}
+
+.text-muted {
+	color: #aaa !important;
+}
+
+a {
+	color: #6cb8ff;
+}
+
+.recent-item {
+	display: flex;
+	align-items: center;
+	cursor: pointer;
+}
+
+.recent-item .names {
+	flex: 1;
+	min-width: 0;
+}
+
+.recent-item .folder {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.recent-item.missing {
+	opacity: 0.5;
+}
+
+.recent-item .remove {
+	visibility: hidden;
+	color: #aaa;
+	background: none;
+	border: none;
+	font-size: 1.3em;
+	line-height: 1;
+	padding: 0 4px;
+}
+
+.recent-item:hover .remove {
+	visibility: visible;
+}
+
+.recent-item .remove:hover {
+	color: #fff;
+}
+
+.tool {
+	display: flex;
+	align-items: center;
+}
+
+.tool .details {
+	flex: 1;
+	min-width: 0;
+}
+
+.tool .path {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tool .ok {
+	color: #5cd65c;
+}
+
+.tool .missing {
+	color: #ff6b6b;
+}
+
+.log {
+	background-color: #1e1e1e;
+	color: #ccc;
+	border-radius: 4px;
+	padding: 8px 10px;
+	height: 300px;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	user-select: text;
+	font-size: 0.8em;
+}
+
+.log .err {
+	color: #ff8080;
+}
+
+#error pre {
+	white-space: pre-wrap;
+	color: inherit;
+	font-family: inherit;
+	user-select: text;
+}
