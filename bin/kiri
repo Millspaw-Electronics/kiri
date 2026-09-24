@@ -383,7 +383,6 @@ export COMMITS
 export ALL_COMMITS=0
 export ARCHIVE_PROJECT=0
 export DEBUG=0
-export DEBUG_KIDIFF=0
 export DRY_RUN=0
 export LAUNCH_BROWSER=1
 export PAGE_FRAME=1
@@ -397,7 +396,6 @@ export KICAD_PRO_FIND_EXCLUDE_PATTERN="#"
 export NEWEST_COMMIT
 export OLDEST_COMMIT
 export WEBSERVER_PORT
-export KIDIFF_MISSING
 
 # RAW COLORS
 readonly RCO=$(printf "\e[0m")  # Reset COlors
@@ -511,29 +509,6 @@ tac()
 	esac
 }
 
-rename()
-{
-	os=$(identify_operating_system)
-
-	if [[ ${os} != "macOS" ]]; then
-		distro_id="$(grep "^ID=" /etc/os-release | cut -d= -f2)"
-	else
-		distro_id=${os}
-	fi
-
-	case ${distro_id} in
-		"fedora")
-			prename "$@"
-			;;
-		"arch"|"manjaro")
-			perl-rename "$@"
-			;;
-		*)
-			command rename "$@"
-			;;
-	esac
-}
-
 xargs()
 {
 	case ${OSTYPE} in
@@ -543,27 +518,6 @@ xargs()
 		*)
 			command xargs "$@"
 			;;
-	esac
-}
-
-identify_linux_or_wsl()
-{
-	if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
-		echo "WSL"
-	else
-		echo "Linux"
-	fi
-}
-
-identify_operating_system()
-{
-	case "${OSTYPE}" in
-		bsd*)     echo "BSD"     ;;
-		darwin*)  echo "macOS"   ;;
-		linux*)   echo "$(identify_linux_or_wsl)" ;;
-		msys*)    echo "Windows" ;;
-		solaris*) echo "Solaris" ;;
-		*)        echo "Unknown" ;;
 	esac
 }
 
@@ -634,7 +588,6 @@ show_help()
 
 	     -u|--layout      Force starting with the Layout view selected
 	     -f|--page-frame  Disable page frame for PCB
-	     -k|--kicad-cli   Force kicad-cli to plot layout
 
 	     -d|--output-dir  Change output folder path/name. By default it is
 	                      ~/.cache/kiri/<project>-<id>, outside the project, so
@@ -651,11 +604,8 @@ show_help()
 	     -pxy|--pcb_xy x,y
 	                      Set x,y of svg viewBox for PCBs (workaround for problematic SVG's of Kicad)
 
-	     -R|--raw-svg)    Disable svg optimization
-
 	     -X|--super-debug Tons of things
 	     -D|--debug       Extra info
-	    -dk|--debug-pcb   Show Kidiff stdout and stderr
 	     -y|--dry-run     Run without generate artifacts
 	     -V|--verbose     Verbose
 
@@ -702,10 +652,6 @@ is_tool_avail()
 
 check_required_tools()
 {
-	local no_exit=1
-
-	readonly KIDIFF_MISSING=$(is_tool_avail "kidiff" ${no_exit})
-
 	case ${OSTYPE} in
 		darwin*)
 			is_tool_avail "gsed"
@@ -861,12 +807,6 @@ command_line_parse()
 
 			-D|--debug)
 				DEBUG=1
-				DEBUG_KIDIFF=1
-				shift
-				;;
-
-			-Dk|-DK|-dk|--debug-kidiff)
-				DEBUG_KIDIFF=1
 				shift
 				;;
 
@@ -886,13 +826,14 @@ command_line_parse()
 				shift
 				;;
 
-			-f|--frame)
+			-f|--frame|--page-frame)
 				PAGE_FRAME=0
 				shift
 				;;
 
-			-k|--kicad-cli)
-				PLOT_LAYOUT_WITH_KICAD_CLI=1
+			# Layouts are always plotted with kicad-cli and svgo is no longer
+			# used. Accept these old options so existing commands keep working.
+			-k|--kicad-cli|-R|--raw-svg)
 				shift
 				;;
 
@@ -909,11 +850,6 @@ command_line_parse()
 			-sxy|--sch_xy)
 				SCH_SVG_VIEWBOX_XY="${2}"
 				shift 2
-				;;
-
-			-R|--raw-svg)
-				DO_NOT_OPTIMIZE_SVG=1
-				shift 1
 				;;
 
 			ls)
@@ -990,38 +926,6 @@ get_kicad_version()
 	kicad_version "$@"
 }
 
-get_kidiff_version()
-{
-	local kidiff_repo_path
-	local super_git_path
-	local last_commit_hash
-	local last_commit_date
-	local submodule_version
-
-	kidiff_repo_path=$(dirname "$(dirname "$(which kidiff)")")
-	git_toplevel=$(git --git-dir "${kidiff_repo_path}/.git" rev-parse --show-toplevel)
-
-	super_git_path="${kidiff_repo_path}/.git"
-	submodule_git_path="${git_toplevel}/.git"
-
-	# Using standalone cloned KiDiff project
-	if [[ "${kidiff_repo_path}" == "${git_toplevel}" ]]; then
-		last_commit_hash=$(git --git-dir "${super_git_path}" rev-parse --short HEAD)
-		last_commit_date=$(git --git-dir "${super_git_path}" log -1 --format="%at")
-		last_commit_date_formatted=$(date -d @"${last_commit_date}" +"%Y/%m/%d %Hh%M")
-		echo "${last_commit_hash} ${last_commit_date_formatted}"
-	else
-		# Using cloned KiDiff as KiRI submodule
-		if [[ -d "${submodule_git_path}" ]]; then
-		submodule_version=$(git --git-dir "${submodule_git_path}" submodule status -- "submodules/KiCad-Diff" | sed "s/^[ ]\+//g")
-		echo "${submodule_version}"
-		# Kidiff was not cloned from git so it does not have version
-		else
-			echo "(unknown version)"
-		fi
-	fi
-}
-
 get_kiri_version()
 {
 	local tool_path
@@ -1044,16 +948,16 @@ get_kiri_version()
 
 show_tools_versions()
 {
-	if which kidiff &> /dev/null; then
-		kidiff_version="kidiff $(get_kidiff_version)"
+	if which kicad-cli &> /dev/null; then
+		kicad_cli_version="kicad-cli $(kicad-cli version 2> /dev/null)"
 	else
-		kidiff_version="kidiff is not installed"
+		kicad_cli_version="kicad-cli is not installed"
 	fi
 
 	IFS= read -r -d '' VERSION <<-EOM
 	    $(basename "${0}") $(get_kiri_version)
 	    kicad $(kicad_version)
-	    ${kidiff_version}
+	    ${kicad_cli_version}
 	EOM
 
 	printf "\n%s\n" "${VERSION}"
@@ -1648,34 +1552,6 @@ generate_schematic_artifacts()
 		fi
 	done < "${PAGES_FILE_2}"
 	IFS="${original_ifs}"
-
-	if which svgo &> /dev/null; then
-		if [[ -z ${DO_NOT_OPTIMIZE_SVG} ]]; then
-			if [[ "${i}" == "2" ]]; then
-				msg="# Optimizing svg for web, ${commit_hash_1}"
-				cmd="optimize_svg_for_web ${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/sch"
-				end="${command_end}"
-				cmd_run "${cmd}" "${msg}" "${end}"
-			fi
-			msg="# Optimizing svg for web, ${commit_hash_2}"
-			cmd="optimize_svg_for_web ${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/sch"
-			end="${command_end}"
-			cmd_run "${cmd}" "${msg}" "${end}"
-		fi
-	fi
-}
-
-kicad_cli_has_multi_mode()
-{
-	# kicad-cli can plot every layer in one run ("--mode-multi") since KiCad 9
-	if [[ -z "${KICAD_CLI_MULTI_MODE}" ]]; then
-		if kicad-cli pcb export svg --help 2>&1 | grep -q -- "--mode-multi"; then
-			KICAD_CLI_MULTI_MODE=1
-		else
-			KICAD_CLI_MULTI_MODE=0
-		fi
-	fi
-	[[ "${KICAD_CLI_MULTI_MODE}" == 1 ]]
 }
 
 plot_layout_with_kicad_cli()
@@ -1695,66 +1571,51 @@ plot_layout_with_kicad_cli()
 	pcb_layers=$(grep -P "^[ \t]+\([0-9][0-9]* " "${pcb_path}")
 	layers_name=$(echo "${pcb_layers}" | sed "s/\"//g" | sed "s/^[ \t]\+//g" | cut -d" " -f2)
 
-	if kicad_cli_has_multi_mode; then
-
-		# One kicad-cli run for all layers. Starting kicad-cli and loading the
-		# board takes most of the time, so this is much faster than one run
-		# per layer. It writes <board>-<layer>.svg, with "." in layer names
-		# replaced by "_", so rename the files to layer-NN.svg afterwards.
-		local multi_dir="${svg_dir}/.multi"
-		local board_name
-		local layers_list
-		local command_end="&> /dev/null"
-		if [[ "${DEBUG}" == 1 ]]; then
-			command_end=""
-		fi
-
-		board_name="$(basename "${kicad_pcb}" .kicad_pcb)"
-		layers_list="$(echo "${layers_name}" | paste -sd, -)"
-
-		rm -rf "${multi_dir}"
-		mkdir -p "${multi_dir}"
-
-		msg="# Plotting layout ${commit_hash}, ${kicad_pcb}"
-		cmd="kicad-cli pcb export svg --mode-multi --page-size-mode 0 --black-and-white --common-layers Edge.Cuts --layers \"${layers_list}\" --output \"${multi_dir}\" \"${pcb_path}\""
-		cmd_run "${cmd}" "${msg}" "${command_end}"
-
-		local layer_line
-		local file_name
-		for layer_name in ${layers_name[@]}; do
-			layer_line=$(echo "${pcb_layers}" | grep "\"${layer_name}\"" | head -n 1)
-			layer_id=$(echo "${layer_line}" | sed "s/[ \t]*(//g" | cut -d " " -f 1 | xargs printf "%02d")
-			# The file is named after the layer's display name, the last quoted
-			# name on its line, e.g. (9 "F.Adhes" user "F.Adhesive")
-			file_name=$(echo "${layer_line}" | sed -E 's/.*"([^"]+)"[^"]*$/\1/')
-			file_name="${board_name}-${file_name//./_}.svg"
-			if [[ -f "${multi_dir}/${file_name}" ]]; then
-				mv -f "${multi_dir}/${file_name}" "${svg_dir}/layer-${layer_id}.svg"
-			else
-				echo -e "    ${LRE}Layer ${layer_name} was not plotted for ${commit_hash}${RCO}" >&2
-			fi
-		done
-
-		rm -rf "${multi_dir}"
-
-	else
-
-		# Older kicad-cli: one run per layer, in the background
-		local command_end="&> /dev/null &"
-		if [[ "${DEBUG}" == 1 ]]; then
-			command_end="&"
-		fi
-
-		for layer_name in ${layers_name[@]}; do
-
-			layer_id=$(echo "${pcb_layers}" | grep "${layer_name}" | sed "s/[ \t]*(//g" | cut -d " " -f 1 | xargs printf "%02d")
-
-			msg="# Plotting layout ${commit_hash}, ${kicad_pcb} - ${layer_name}"
-			cmd="kicad-cli pcb export svg --page-size-mode 0 --black-and-white \"${pcb_path}\" --output \"${svg_dir}/layer-${layer_id}.svg\" --layers \"Edge.Cuts,${layer_name}\""
-			cmd_run "${cmd}" "${msg}" "${command_end}"
-
-		done
+	# One kicad-cli run for all layers ("--mode-multi", KiCad 9 and later).
+	# Starting kicad-cli and loading the board takes most of the time, so this
+	# is much faster than one run per layer. It writes <board>-<layer>.svg,
+	# with "." in layer names replaced by "_", so rename the files to
+	# layer-NN.svg afterwards.
+	local multi_dir="${svg_dir}/.multi"
+	local board_name
+	local layers_list
+	local drawing_sheet_parameter
+	local command_end="&> /dev/null"
+	if [[ "${DEBUG}" == 1 ]]; then
+		command_end=""
 	fi
+
+	if [[ "${PAGE_FRAME}" == 0 ]]; then
+		drawing_sheet_parameter="--exclude-drawing-sheet"
+	fi
+
+	board_name="$(basename "${kicad_pcb}" .kicad_pcb)"
+	layers_list="$(echo "${layers_name}" | paste -sd, -)"
+
+	rm -rf "${multi_dir}"
+	mkdir -p "${multi_dir}"
+
+	msg="# Plotting layout ${commit_hash}, ${kicad_pcb}"
+	cmd="kicad-cli pcb export svg --mode-multi --page-size-mode 0 --black-and-white ${drawing_sheet_parameter} --common-layers Edge.Cuts --layers \"${layers_list}\" --output \"${multi_dir}\" \"${pcb_path}\""
+	cmd_run "${cmd}" "${msg}" "${command_end}"
+
+	local layer_line
+	local file_name
+	for layer_name in ${layers_name[@]}; do
+		layer_line=$(echo "${pcb_layers}" | grep "\"${layer_name}\"" | head -n 1)
+		layer_id=$(echo "${layer_line}" | sed "s/[ \t]*(//g" | cut -d " " -f 1 | xargs printf "%02d")
+		# The file is named after the layer's display name, the last quoted
+		# name on its line, e.g. (9 "F.Adhes" user "F.Adhesive")
+		file_name=$(echo "${layer_line}" | sed -E 's/.*"([^"]+)"[^"]*$/\1/')
+		file_name="${board_name}-${file_name//./_}.svg"
+		if [[ -f "${multi_dir}/${file_name}" ]]; then
+			mv -f "${multi_dir}/${file_name}" "${svg_dir}/layer-${layer_id}.svg"
+		else
+			echo -e "    ${LRE}Layer ${layer_name} was not plotted for ${commit_hash}${RCO}" >&2
+		fi
+	done
+
+	rm -rf "${multi_dir}"
 }
 
 generate_layout_artifacts()
@@ -1763,172 +1624,19 @@ generate_layout_artifacts()
 	local commit_hash_2="${2}"
 	local kicad_pcb_1="${3}"
 	local kicad_pcb_2="${4}"
-	local kicad_project_name_1="${5}"
-	local kicad_project_name_2="${6}"
+	local i="${5}"
 
-	local proj_name_1=${8}
-	local proj_name_2=${9}
+	local SVG1_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/pcb"
+	local SVG2_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/pcb"
+	mkdir -p "${SVG1_DIR_PATH}"
+	mkdir -p "${SVG2_DIR_PATH}"
 
-	# kicad-cli to plot layers works but KICAD-DIFF is faster
-	# use it only if kicad-diff is missing
-
-	if [[ -f $(which kicad-cli 2> /dev/null) ]] && [[ ${PLOT_LAYOUT_WITH_KICAD_CLI} == 1 ]]; then
-
-		local command_end="&> /dev/null &"
-		if [[ "${DEBUG}" == 1 ]]; then
-			command_end="&"
-		fi
-
-		# Configure git-imagediff used by plotgitsch
-		export SVG1_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/pcb"
-		export SVG2_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/pcb"
-		mkdir -p "${SVG1_DIR_PATH}"
-		mkdir -p "${SVG2_DIR_PATH}"
-
-		# This one is needed only once since it is always the same
-		if [[ "${i}" == "2" ]]; then
-			plot_layout_with_kicad_cli "${commit_hash_1}" "${kicad_pcb_1}" "${SVG1_DIR_PATH}"
-		fi
-
-		plot_layout_with_kicad_cli "${commit_hash_2}" "${kicad_pcb_2}" "${SVG2_DIR_PATH}"
-
-	else
-
-		if [[ ! "${KIDIFF_MISSING}" == 1 ]]; then
-
-			local command_end="&> /dev/null"
-
-			# verbose shows errors only
-			if [[ "${VERBOSE}" == "1" ]]; then
-				command_end="2>&1 >/dev/null"
-			fi
-
-			# debug shows the whole output
-			if [[ "${DEBUG}" == "1" ]] || [[ "${DEBUG_KIDIFF}" == "1" ]]; then
-				command_end=""
-			fi
-
-			# Kidiff does local diff using ${kicad_pcb} name, so update it here
-			if [[ "${commit_hash_1}" == "_local_" ]]; then commit_hash_1="${kicad_pcb_1}"; fi
-			if [[ "${commit_hash_2}" == "_local_" ]]; then commit_hash_2="${kicad_pcb_2}"; fi
-
-			if [[ ${PAGE_FRAME} == "1" ]]; then
-				page_frame_parameter="-f"
-			fi
-
-			msg="# Plotting layouts ${commit_hash_1}, ${commit_hash_2}"
-			cmd="kidiff -k -n --webserver-disable -a ${commit_hash_1} -b ${commit_hash_2} -o \"${OUTPUT_DIR_PATH}\" ${page_frame_parameter} \"${kicad_pcb}\""
-			end="${command_end}"
-			cmd_run "${cmd}" "${msg}" "${end}"
-
-			# Revert commits back to _local_ to finish the cleanup
-			if [[ "${commit_hash_1}" == "${kicad_pcb_1}" ]]; then commit_hash_1="_local_"; fi
-			if [[ "${commit_hash_2}" == "${kicad_pcb_2}" ]]; then commit_hash_2="_local_"; fi
-
-			# mkdir -p "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/pcb/"
-			# mkdir -p "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/pcb/"
-
-			# Fix folder name, kidiff generates local instead of _local_
-			if [[ -d "${OUTPUT_DIR_PATH}/local/" ]]; then
-				if [[ -d "${OUTPUT_DIR_PATH}/_local_/" ]]; then
-					mv "${OUTPUT_DIR_PATH}/local/"* "${OUTPUT_DIR_PATH}/_local_/" &> /dev/null
-				fi
-				rm -fr "${OUTPUT_DIR_PATH}/local" &> /dev/null
-			fi
-
-			# Rename files folowing format: layer-xx.svg
-			rename "s|${kicad_project_name_1}-(\d+).svg$|layer-\1.svg|" "${OUTPUT_DIR_PATH}/${commit_hash_1}/pcb/"*.svg &> /dev/null
-			rename "s|${kicad_project_name_2}-(\d+).svg$|layer-\1.svg|" "${OUTPUT_DIR_PATH}/${commit_hash_2}/pcb/"*.svg &> /dev/null
-
-			# Move files
-			mv -f "${OUTPUT_DIR_PATH}/${commit_hash_1}/pcb/" "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/" &> /dev/null
-			mv -f "${OUTPUT_DIR_PATH}/${commit_hash_2}/pcb/" "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/" &> /dev/null
-		fi
+	# This one is needed only once since it is always the same
+	if [[ "${i}" == "2" ]]; then
+		plot_layout_with_kicad_cli "${commit_hash_1}" "${kicad_pcb_1}" "${SVG1_DIR_PATH}"
 	fi
 
-	if which svgo &> /dev/null; then
-		if [[ -z ${DO_NOT_OPTIMIZE_SVG} ]]; then
-			if [[ "${i}" == "2" ]]; then
-				msg="# Optimizing svg for web, ${commit_hash_1}"
-				cmd="optimize_svg_for_web ${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/pcb"
-				end="${command_end}"
-				cmd_run "${cmd}" "${msg}" "${end}"
-			fi
-			msg="# Optimizing svg for web, ${commit_hash_2}"
-			cmd="optimize_svg_for_web ${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/pcb"
-			end="${command_end}"
-			cmd_run "${cmd}" "${msg}" "${end}"
-		fi
-	fi
-}
-
-generate_3dmodels()
-{
-	local commit_hash_1="${1}"
-	local commit_hash_2="${2}"
-	local kicad_pcb_1="${3}"
-	local kicad_pcb_2="${4}"
-	local kicad_project_name_1="${5}"
-	local kicad_project_name_2="${6}"
-
-	local command_end="&> /dev/null"
-
-	# verbose shows errors only
-	if [[ "${VERBOSE}" == "1" ]]; then
-		command_end="2>&1 >/dev/null"
-	fi
-
-	# debug shows the whole output
-	if [[ "${DEBUG}" == "1" ]]; then
-		command_end=""
-	fi
-
-	if [[ ! -f $(which stp2gltf) ]]; then
-		return
-	fi
-
-	end="${command_end}"
-
-	mkdir -p "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/3d_model/"
-	mkdir -p "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/3d_model/"
-
-	# Export step, if missing
-	if [[ ! -f "${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_project_name_1}.step" ]]; then
-		msg="# Exporting ${commit_hash_1} .kicad_pcb to .step"
-		cmd="kicad-cli pcb export step --subst-models -f -o \"${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/3d_model/${kicad_project_name_1}.step\" \"${kicad_pcb_1}\""
-		cmd_run "${cmd}" "${msg}" "${end}"
-	else
-		# echo "${commit_hash_1}, 3D Model ${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_project_name_1}.step found"
-		cp -f "${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_project_name_1}.step" "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/3d_model/"
-	fi
-
-	# Export step, if missing
-	if [[ ! -f "${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_project_name_2}.step" ]]; then
-		msg="# Exporting ${commit_hash_2} .kicad_pcb to .step"
-		cmd="kicad-cli pcb export step --subst-models -f -o \"${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/3d_model/${kicad_project_name_2}.step\" \"${kicad_pcb_2}\""
-		cmd_run "${cmd}" "${msg}" "${end}"
-	else
-		# echo "${commit_hash_2}, 3D Model ${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_project_name_2}.step found"
-		cp -f "${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_project_name_2}.step" "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/3d_model/"
-	fi
-
-	# Convert step to to gltf
-	if [[ -f "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/3d_model/${kicad_project_name_1}.step" ]] && [[ ! -f "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/3d_model/${kicad_project_name_1}.gltf" ]]; then
-		cd "${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/3d_model/"
-		msg="# Converting ${commit_hash_1} 3D Model from .step to .gltf/.bin"
-		cmd="stp2gltf ${kicad_project_name_1}.step ${kicad_project_name_1}.gltf ${kicad_project_name_1}.bin"
-		cmd_run "${cmd}" "${msg}" "${end}"
-		cd - &> /dev/null
-	fi
-
-	# Convert step to to gltf
-	if [[ -f "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/3d_model/${kicad_project_name_2}.step" ]] && [[ ! -f "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/3d_model/${kicad_project_name_2}.gltf" ]]; then
-		cd "${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/3d_model/"
-		msg="# Converting ${commit_hash_2} 3D Model from .step to .gltf/.bin"
-		cmd="stp2gltf ${kicad_project_name_2}.step ${kicad_project_name_2}.gltf ${kicad_project_name_2}.bin"
-		cmd_run "${cmd}" "${msg}" "${end}"
-		cd - &> /dev/null
-	fi
+	plot_layout_with_kicad_cli "${commit_hash_2}" "${kicad_pcb_2}" "${SVG2_DIR_PATH}"
 }
 
 generate_diffs()
@@ -2068,7 +1776,7 @@ generate_diffs()
 				create_list_of_layers "${hash_2}" "${OUTPUT_DIR_PATH}/${hash_2}/${kicad_pcb_2}"
 
 				generate_schematic_artifacts "${hash_1}" "${hash_2}" "${kicad_sch_1}" "${kicad_sch_2}" "${i}"
-				generate_layout_artifacts "${hash_1}" "${hash_2}" "${kicad_pcb_1}" "${kicad_pcb_2}" "${kicad_project_name_1}" "${kicad_project_name_2}"
+				generate_layout_artifacts "${hash_1}" "${hash_2}" "${kicad_pcb_1}" "${kicad_pcb_2}" "${i}"
 
 				if [[ -n ${SCH_SVG_VIEWBOX_XY} ]]; then
 					update_svg_viewport "${hash_1}" "${hash_2}" "${i}" "sch"
@@ -2077,8 +1785,6 @@ generate_diffs()
 				if [[ -n ${PCB_SVG_VIEWBOX_XY} ]]; then
 					update_svg_viewport "${hash_1}" "${hash_2}" "${i}" "pcb"
 				fi
-
-				# generate_3dmodels "${hash_1}" "${hash_2}" "${kicad_pcb_1}" "${kicad_pcb_2}" "${kicad_project_name_1}" "${kicad_project_name_2}"
 			fi
 		done
 	done
@@ -2150,9 +1856,6 @@ build_main_html()
 
 	mkdir -p "${WEB_DIR_PATH}/"
 
-	# Remove Kidiff leftovers
-	rm -rf "${WEB_DIR_PATH}/triptych"
-
 	echo -e "\n${LBL}${LBL}Assembling the HTML${RCO}"
 
 	# Copy assets
@@ -2164,9 +1867,6 @@ build_main_html()
 	cp -f "${KIRI_HOME_PATH}/assets/favicon.ico"   "${WEB_DIR_PATH}/"
 	cp -f "${KIRI_HOME_PATH}/assets/redirect.html" "${WEB_DIR_PATH}/../index.html"
 	cp -f "${KIRI_HOME_PATH}/bin/kiri-server"      "${OUTPUT_DIR_PATH}/"
-
-	# Testing
-	cp -rf "${KIRI_HOME_PATH}/assets/gltfc"         "${WEB_DIR_PATH}/" &> /dev/null
 
 	# Index of the initial commits (in the COMMITS list)
 	commit1_i=0
@@ -2393,7 +2093,7 @@ show_project_files()
 
 show_main_global_variables()
 {
-	if [[ "${VERBOSE}" == 1 ]] || [[ "${DEBUG}" == 1 ]] || [[ "${DEBUG_KIDIFF}" == 1 ]]; then
+	if [[ "${VERBOSE}" == 1 ]] || [[ "${DEBUG}" == 1 ]]; then
 		(
 			echo
 			echo "          KIRI_HOME_PATH = ${KIRI_HOME_PATH}"
@@ -2446,6 +2146,10 @@ main()
 	fi
 
 	get_git_commits_list "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}" "${kicad_sch_pages}"
+
+	# Schematics and layouts are plotted with kicad-cli (KiCad 9 or newer)
+	is_tool_avail "kicad-cli"
+
 	generate_diffs
 	build_main_html
 
