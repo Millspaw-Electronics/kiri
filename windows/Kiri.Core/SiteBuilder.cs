@@ -91,7 +91,7 @@ public static class SiteBuilder
             sb.Append($"""
                 <!-- Commit {i + 1} -->
                 <input class="chkGroup" type="checkbox" id="{hash}" name="commit" value="{hash}" onchange="update_commits()">
-                <label class="text-sm-left list-group-item" style="display: block; width: 445px; margin-left: 0px;" for="{hash}">
+                <label class="text-sm-left list-group-item" style="display: block; margin-left: 0px;" for="{hash}">
                     <table data-toggle="tooltip" title="{tooltip}">
                         <tr>
                             <td rowspan=2 style="vertical-align: top; width: 1.8em;">

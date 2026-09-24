@@ -44,6 +44,23 @@ html, body {
 	padding: 1px;
 	margin: 4px;
 	border-radius: 5px;
+	border-left: 4px solid transparent;
+	cursor: pointer;
+}
+
+.list-group input[type="checkbox"] + .list-group-item:hover {
+	background-color: #2c2c2c;
+}
+
+/* Fit the commit to the sidebar: the first line is cut off with an
+   ellipsis and the message wraps */
+.list-group input[type="checkbox"] + .list-group-item table {
+	width: 100%;
+	table-layout: fixed;
+}
+
+.list-group input[type="checkbox"] + .list-group-item em {
+	overflow-wrap: anywhere;
 }
 
 .list-group input[type="checkbox"] + .list-group-item:before {
@@ -52,9 +69,19 @@ html, body {
 }
 
 .list-group input[type="checkbox"]:checked + .list-group-item {
-	background-color: #111;
+	background-color: #3d4650;
 	color: #fff;
 	border-radius: 5px;
+	border-left-color: #8fa3b8;
+}
+
+/* The two selected commits are marked with their colours in the diff */
+.list-group input[type="checkbox"]:checked + .list-group-item.commit-newer {
+	border-left-color: #00b8b8;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item.commit-older {
+	border-left-color: #e03030;
 }
 
 .list-group input[type="checkbox"]:checked + .list-group-item:before {
@@ -129,7 +156,7 @@ html, body {
 }
 
 .list-group input[type="radio"]:checked + .list-group-item {
-	background-color: #111111;
+	background-color: #3d4650;
 	color: #FFF;
 }
 

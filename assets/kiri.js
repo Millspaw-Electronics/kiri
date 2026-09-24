@@ -573,6 +573,8 @@ function update_commits() {
     commit1 = hashes[0].replace(/\s+/g, '');
     commit2 = hashes[1].replace(/\s+/g, '');
 
+    mark_selected_commits();
+
     console.log("commit1:", commit1);
     console.log("commit2:", commit2);
 
@@ -611,6 +613,25 @@ function update_commits() {
     } else {
         update_layer();
     }
+}
+
+// Colour-code the two selected commits like the diff (newer and older)
+function mark_selected_commits()
+{
+    $("#commits_form label.list-group-item").removeClass("commit-newer commit-older");
+    $("#commits_form label[for='" + commit1 + "']").addClass("commit-newer");
+    $("#commits_form label[for='" + commit2 + "']").addClass("commit-older");
+}
+
+// Title blocks without a revision or date get "[rev]" or "[date]"; hide those
+function hide_missing_title_fields()
+{
+    $(".title-rev").each(function() {
+        if ($(this).text().includes("[rev]")) $(this).hide();
+    });
+    $(".title-date").each(function() {
+        if ($(this).text().includes("[date]")) $(this).hide();
+    });
 }
 
 function loadFile(filePath) {
@@ -1148,6 +1169,7 @@ $(document).ready(function()
 
 function ready()
 {
+    hide_missing_title_fields();
     check_server_status();
     select_initial_commits();
 
