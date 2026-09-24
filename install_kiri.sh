@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Install KiRI, its dependencies, KiCad and the KiCad plugin, and set up the
-# shell environment.
+# Install KiRI, its dependencies and KiCad, and set up the shell environment.
+# KiRI needs KiCad 9 or newer.
 #
 # Run it straight from GitHub:
 #
@@ -20,8 +20,6 @@
 #   KIRI_KICAD_PPA          KiCad PPA used on Ubuntu (default: ppa:kicad/kicad-10.0-releases).
 #                           Set it to an empty string to use the distribution's KiCad.
 #   KIRI_SKIP_DEPENDENCIES  Set to 1 to skip installing system packages.
-#   KIRI_WITH_PLOTGITSCH    Set to 1 to also build plotgitsch with opam. It is only
-#                           needed for KiCad 5 schematics; KiCad 7 and later use kicad-cli.
 
 CI=$(tput setaf 3 2> /dev/null) # Color Info
 CW=$(tput setaf 1 2> /dev/null) # Color Warning
@@ -169,18 +167,15 @@ linux_install_software_with_apt()
 	sudo apt-get update
 
 	# Base packages
-	apt_install git curl coreutils rename zenity xdotool librsvg2-bin imagemagick
+	apt_install git curl coreutils dos2unix
 
-	# Python and the KiCad-Diff dependencies, from Ubuntu's packages because
-	# system-wide pip installs are blocked on current Ubuntu releases
-	apt_install python3 python-is-python3 python3-pil python3-six python3-dateutil python3-tz python3-wxgtk4.0
+	# Python, and wxPython for the project file picker (kiri-file-picker), from
+	# Ubuntu's packages because system-wide pip installs are blocked on current
+	# Ubuntu releases
+	apt_install python3 python-is-python3 python3-wxgtk4.0
 
 	# KiCad, including kicad-cli and the pcbnew Python module
 	apt_install kicad
-
-	if [[ "${KIRI_WITH_PLOTGITSCH}" == "1" ]]; then
-		apt_install build-essential libgtk-3-dev libgmp-dev pkg-config opam
-	fi
 }
 
 # =============================================
@@ -198,13 +193,7 @@ linux_install_software_with_dnf()
 	sudo dnf install -y curl
 	sudo dnf install -y python3-pip
 	sudo dnf install -y kicad
-	sudo dnf install -y ImageMagick
-	sudo dnf install -y xdotool
-	sudo dnf install -y prename # perl rename and not util-linux
-
-	if [[ "${KIRI_WITH_PLOTGITSCH}" == "1" ]]; then
-		sudo dnf install -y opam
-	fi
+	sudo dnf install -y dos2unix
 }
 
 # =============================================
@@ -221,13 +210,7 @@ linux_install_software_with_pacman()
 	yes | sudo pacman -S patch --needed
 	yes | sudo pacman -S python-pip --needed
 	yes | sudo pacman -S kicad --needed
-	yes | sudo pacman -S imagemagick --needed
-	yes | sudo pacman -S xdotool --needed
-	yes | sudo pacman -S perl-rename --needed
-
-	if [[ "${KIRI_WITH_PLOTGITSCH}" == "1" ]]; then
-		yes | sudo pacman -S opam --needed
-	fi
+	yes | sudo pacman -S dos2unix --needed
 }
 
 # =============================================
@@ -244,10 +227,7 @@ macos_install_homebrew()
 
 macos_install_kicad()
 {
-	kicad_5="/Applications/Kicad/Kicad.app"
-	kicad_6="/Applications/KiCad/KiCad.app"
-
-	if [[ ! -d "${kicad_5}" ]] && [[ ! -d "${kicad_6}" ]]; then
+	if [[ ! -d "/Applications/KiCad/KiCad.app" ]]; then
 		brew install --cask kicad
 	fi
 }
@@ -262,23 +242,12 @@ macos_install_brew_modules()
 	# Base dependencies
 	brew install git
 
-	# Opam dependencies
-	if [[ "${KIRI_WITH_PLOTGITSCH}" == "1" ]]; then
-		brew install gmp
-		brew install pkg-config
-		brew install opam
-	fi
-
 	# KiRI dependencies
 	brew install gsed
 	brew install findutils
 	brew install coreutils
 	brew install wxpython
 	brew install wxwidgets
-	brew install librsvg
-	brew install imagemagick
-	brew install cliclick
-	brew install rename
 	brew install dos2unix
 }
 
@@ -357,79 +326,6 @@ install_kiri()
 }
 
 # =============================================
-# plotgitsch (KiCad 5 schematics only)
-# =============================================
-
-init_opam()
-{
-	if [[ -z "${OPAM_VERSION}" ]]; then
-		OPAM_VERSION=4.10.2
-	fi
-
-	if [[ ! -d "${HOME}/.opam/${OPAM_VERSION}" ]]; then
-		yes | opam init --disable-sandboxing --reinit
-		opam switch create ${OPAM_VERSION}
-	else
-		opam switch ${OPAM_VERSION}
-	fi
-
-	eval "$(opam env)"
-}
-
-install_opam_modules()
-{
-	eval "$(opam env)"
-
-	# Update packages knowledge
-	opam update
-
-	# Plotgitsch dependencies
-	opam install -y digestif
-	opam install -y lwt
-	opam install -y lwt_ppx
-	opam install -y cmdliner
-	opam install -y base64
-	opam install -y sha
-	opam install -y tyxml
-	opam install -y git
-	opam install -y git-unix
-}
-
-install_plotgitsch()
-{
-	if [[ "${KIRI_WITH_PLOTGITSCH}" != "1" ]]; then
-		return
-	fi
-
-	if ! which opam &> /dev/null; then
-		warning "opam is missing, so plotgitsch was not installed"
-		return
-	fi
-
-	info "Building plotgitsch"
-	init_opam
-	install_opam_modules
-
-	cd "${KIRI_DIR}/submodules/plotkicadsch" || return
-	opam pin add -y kicadsch .
-	opam pin add -y plotkicadsch .
-	opam update -y
-	opam install -y plotkicadsch
-	cd - > /dev/null || return
-}
-
-# =============================================
-# KiCad plugin
-# =============================================
-
-install_kicad_plugin()
-{
-	info "Installing the KiCad plugin"
-	PATH="${KIRI_DIR}/bin:${PATH}" KIRI_REPO_PATH="${KIRI_DIR}" bash "${KIRI_DIR}/install_plugin.sh" > /dev/null \
-		|| warning "Could not install the KiCad plugin"
-}
-
-# =============================================
 # Shell environment
 # =============================================
 
@@ -443,10 +339,7 @@ setup_shell_environment()
 	${begin}
 	# Added by the KiRI installer. Re-running the installer updates this block.
 	export KIRI_HOME="${KIRI_DIR}"
-	export PATH="\${KIRI_HOME}/submodules/KiCad-Diff/bin:\${KIRI_HOME}/bin:\${PATH}"
-	if command -v opam > /dev/null 2>&1 && [ -d "\${OPAMROOT:-\${HOME}/.opam}" ]; then
-	    eval "\$(opam env)"
-	fi
+	export PATH="\${KIRI_HOME}/bin:\${PATH}"
 	${end}
 	EOM
 
@@ -546,8 +439,6 @@ main()
 	fi
 
 	install_kiri
-	install_plotgitsch
-	install_kicad_plugin
 	setup_shell_environment
 	show_final_message
 }

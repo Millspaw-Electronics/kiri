@@ -1,10 +1,3 @@
-[submodule "plotkicadsch"]
-	path = submodules/plotkicadsch
-	url = https://github.com/jnavila/plotkicadsch.git
-	branch = master
-[submodule "KiCad-Diff"]
-	path = submodules/KiCad-Diff
-	url = https://github.com/leoheck/KiCad-Diff.git
 [submodule "submodules/kicad_parser"]
 	path = submodules/kicad_parser
 	url = https://github.com/leoheck/kicad_parser.git
