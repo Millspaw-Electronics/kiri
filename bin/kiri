@@ -3,13 +3,10 @@
 export LD_LIBRARY_PATH="/usr/lib/kicad/lib/x86_64-linux-gnu/:${LD_LIBRARY_PATH}"
 export PYTHONPATH="${PYTHONPATH}:/usr/lib/kicad/lib/python3/dist-packages/"
 
-# kicad-cli on macOS (to avoid using shitty clickclick)
+# kicad-cli on macOS
 export PATH=/Applications/KiCad/KiCad.app/Contents/MacOS/:${PATH}
 
-# Kicad 5 files will be ploted with plotgitcsch
-# FORCE_PLOTTING_GRAPHICALLY env variable forces it to be ploted graphically
-# Set it with before runing Kiri with
-# export FORCE_PLOTTING_GRAPHICALLY=1
+# KiRI needs KiCad 9 or newer: schematics and layouts are plotted with kicad-cli
 
 # shellcheck disable=SC2155 # Disable declare and assign separately
 
@@ -70,14 +67,13 @@ insert_commits_html()
 		local kicad_sch=$(get_kicad_sch "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}" "${kicad_pro_extension}")
 		local kicad_pcb=$(get_kicad_pcb "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}")
 		local kicad_sch_pages=$(get_kicad_sch_pages "${KICAD_PROJ_ABSOLUTE_PATH}/${kicad_sch}")
-		local kicad_cache_lib=$(get_kicad_cache_lib "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}")
-		# show_project_files "${OUTPUT_DIR_PATH}/${hash}" "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}" "${kicad_cache_lib}"
+		# show_project_files "${OUTPUT_DIR_PATH}/${hash}" "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}"
 
 		if [[ "${hash}" != "_local_" ]]; then
 
 			local path_to_git_root="$(realpath --relative-to="${KICAD_PROJ_ABSOLUTE_PATH}" "${REPO_ABSOLUTE_PATH}")"
 
-			# Check for changes in ".sch|.kicad_sch" files
+			# Check for changes in .kicad_sch files
 			if git log --name-only --pretty='format:' -1 -U "${hash}" -- "${path_to_git_root}/${KICAD_PROJ_NESTED_PATH}" | cat | grep -q -s -E "${kicad_sch// /|}${kicad_sch_pages}"; then
 				sch_icon="${sch_img}"
 			else
@@ -103,7 +99,7 @@ insert_commits_html()
 
 		else
 
-			# Check for changes in ".sch|.kicad_sch" files
+			# Check for changes in .kicad_sch files
 			if git status -uno  | grep -q -s -E "${kicad_pro}${kicad_sch// /|}${kicad_pcb}${kicad_sch_pages}"; then
 				sch_icon="${sch_img}"
 			else
@@ -388,28 +384,20 @@ export ALL_COMMITS=0
 export ARCHIVE_PROJECT=0
 export DEBUG=0
 export DEBUG_KIDIFF=0
-export DEBUG_PLOTGITSCH=0
 export DRY_RUN=0
 export LAUNCH_BROWSER=1
 export PAGE_FRAME=1
 export REMOVE_KIRI_FOLDER=0
 export SELECT_LASTEST_N_COMMITS
-export SKIP_CACHE_LIB=0
 export START_ON_LAYOUT_VIEW=0
 export START_SERVER=1
 export VERBOSE=0
-export SKIP_KICAD_6=0
 export KICAD_PRO_FIND_EXCLUDE_PATTERN="#"
 
 export NEWEST_COMMIT
 export OLDEST_COMMIT
 export WEBSERVER_PORT
-export PLOTGITSCH_MISSING
 export KIDIFF_MISSING
-
-if [[ -z ${FORCE_PLOTTING_GRAPHICALLY} ]]; then
-	export FORCE_PLOTTING_GRAPHICALLY=0
-fi
 
 # RAW COLORS
 readonly RCO=$(printf "\e[0m")  # Reset COlors
@@ -612,12 +600,13 @@ show_help()
 
 	DESCRIPTION:
 
-	    Kiri is a proof of concept script to automate the usage of
-	    plotkicadsch (plotgitsch) and Kicad-Diff (kidiff) in a single easy-to-use tool.
+	    Kiri compares the schematics and layouts of the revisions of a
+	    Git-versioned KiCad project in a web page. It needs KiCad 9 or newer
+	    (kicad-cli) to plot them.
 
 	OPTIONS:
 
-	     ls               List commits with changes in .*sch/.kicad_pcb
+	     ls               List commits with changes in .kicad_sch/.kicad_pcb
 	     lsa              List all commits of the project
 
 	     -a|--all         Include all commits even if schematics/layout don't have changes
@@ -643,9 +632,6 @@ show_help()
 	     -p|--port PORT   Set webserver port. By default it will try to use an available port.
 	     -i|--ip ADDR     Override the default 127.0.0.1 IP address
 
-	     -s|--skip-cache  Skip usage of -cache.lib on plotgitsch
-	     -6|--skip-kicad6 Skip plotting Kicad 6 schematics (.kicad.sch)
-
 	     -u|--layout      Force starting with the Layout view selected
 	     -f|--page-frame  Disable page frame for PCB
 	     -k|--kicad-cli   Force kicad-cli to plot layout
@@ -669,7 +655,6 @@ show_help()
 
 	     -X|--super-debug Tons of things
 	     -D|--debug       Extra info
-	    -dp|--debug-sch   Show Plotgitsch stdout and stderr
 	    -dk|--debug-pcb   Show Kidiff stdout and stderr
 	     -y|--dry-run     Run without generate artifacts
 	     -V|--verbose     Verbose
@@ -685,10 +670,10 @@ show_help()
 	    kiri
 
 	    # Kicad project on the root of the repo
-	    kiri board.pro
+	    kiri board.kicad_pro
 
 	    # Nested project (with verbose and starting fresh)
-	    kiri nested-project/board.pro -r -D
+	    kiri nested-project/board.kicad_pro -r -D
 
 	    # Nested project (Debugging issues)
 	    kiri board.kicad_pro -r -D
@@ -719,7 +704,6 @@ check_required_tools()
 {
 	local no_exit=1
 
-	readonly PLOTGITSCH_MISSING=$(is_tool_avail "plotgitsch" ${no_exit})
 	readonly KIDIFF_MISSING=$(is_tool_avail "kidiff" ${no_exit})
 
 	case ${OSTYPE} in
@@ -878,12 +862,6 @@ command_line_parse()
 			-D|--debug)
 				DEBUG=1
 				DEBUG_KIDIFF=1
-				DEBUG_PLOTGITSCH=1
-				shift
-				;;
-
-			-Dp|-DP|-dp|--debug-plotgitsch)
-				DEBUG_PLOTGITSCH=1
 				shift
 				;;
 
@@ -895,11 +873,6 @@ command_line_parse()
 			-x|--archive)
 				ARCHIVE_PROJECT=1
 				START_SERVER=0
-				shift
-				;;
-
-			-s|--skip-cache)
-				SKIP_CACHE_LIB=1
 				shift
 				;;
 
@@ -915,11 +888,6 @@ command_line_parse()
 
 			-f|--frame)
 				PAGE_FRAME=0
-				shift
-				;;
-
-			-6|--skip-kicad6)
-				SKIP_KICAD_6=1
 				shift
 				;;
 
@@ -976,7 +944,7 @@ command_line_parse()
 		if [[ -n ${kicad_pro_path} ]]; then
 			echo "Kicad pro (${kicad_pro_path}) does not exist"
 		fi
-		local kicad_pro_path=$(find ./ -maxdepth 1 -name "*\.pro" -o -name "*\.kicad_pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d" | sort -n | head -n1)
+		local kicad_pro_path=$(find ./ -maxdepth 1 -name "*\.kicad_pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d" | sort -n | head -n1)
 		if [[ -f ${kicad_pro_path} ]]; then
 			if [[ ! "${LIST_COMMITS_AND_LEAVE}" == "1" ]]; then
 				echo "Using Kicad project ${kicad_pro_path}"
@@ -987,6 +955,11 @@ command_line_parse()
 				printf "Kicad project is missing.\n\n"
 				exit 1
 			fi
+	fi
+
+	if [[ "${KICAD_PRO_ABSOLUTE_PATH}" != *.kicad_pro ]]; then
+		printf "%s is not a .kicad_pro file. KiRI needs a KiCad 9 or newer project.\n\n" "${KICAD_PRO_ABSOLUTE_PATH}"
+		exit 1
 	fi
 
 	readonly KICAD_PRO_FILENAME_HEAD=$(basename "${KICAD_PRO_ABSOLUTE_PATH}")
@@ -1071,12 +1044,6 @@ get_kiri_version()
 
 show_tools_versions()
 {
-	if which plotgitsch &> /dev/null; then
-		plotgitsch_version="plotgitsch $(plotgitsch --version)"
-	else
-		plotgitsch_version="plotgitsch is not installed"
-	fi
-
 	if which kidiff &> /dev/null; then
 		kidiff_version="kidiff $(get_kidiff_version)"
 	else
@@ -1086,7 +1053,6 @@ show_tools_versions()
 	IFS= read -r -d '' VERSION <<-EOM
 	    $(basename "${0}") $(get_kiri_version)
 	    kicad $(kicad_version)
-	    ${plotgitsch_version}
 	    ${kidiff_version}
 	EOM
 
@@ -1106,43 +1072,17 @@ get_file_extension()
 
 get_schematic_vesion()
 {
+	# Format:
+	# (version 20250114) # Kicad 9
+	# (version 20260101) # Kicad 10
+
 	local kicad_sch="${1}"
-	local file_extension=$(get_file_extension "${kicad_sch}")
-
-	case ${file_extension} in
-
-		sch)
-			# Format:
-			# EESchema Schematic File Version 4
-			grep -i "File Version" "${kicad_sch}" -m 1 | cut -d" " -f5 | tr -d '\0'
-			;;
-
-		kicad_sch)
-			# Format
-			# (kicad_sch (version 20211123) (generator eeschema) # Kicad 6
-			# (kicad_sch (version 20230121) (generator eeschema) # Kicad 7
-			# (version 20231120) # Kicad 8
-			# (version 20250114) # Kicad 9
-			# (version 20260101) # Kicad 10
-			grep -i "(version" "${kicad_sch}" -m 1 | sed "s/.*version //g" | cut -d")" -f1 | tr -d '\0'
-			;;
-	esac
+	grep -i "(version" "${kicad_sch}" -m 1 | sed "s/.*version //g" | cut -d")" -f1 | tr -d '\0'
 }
 
 get_layout_version()
 {
-	# (kicad_pcb (version 4) (host kicad "dummy file") )
-	# (kicad_pcb (version 20171130) (host pcbnew "(5.0.0-rc2-76-gb5f63567d)")
-	# (kicad_pcb (version 20171130) (host pcbnew "(5.1.6)-1")
-	# (kicad_pcb (version 20171130) (host pcbnew 5.0.0-rc3-unknown-eaf938c~65~ubuntu18.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.0.1-33cea8e~67~ubuntu18.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.1.5+dfsg1-2~bpo10+1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.1.6-c6e7f7d~86~ubuntu20.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 6.0.0-rc1-unknown-da35b16~65~ubuntu18.04.1)
-	# (kicad_pcb (version 20200104) (host pcbnew "(5.99.0-879-ga0698723b)")
-	# (kicad_pcb (version 20210606) (generator pcbnew) # Kicad 6
-	# (kicad_pcb (version 20221018) (generator pcbnew) # Kicad 7
-	# (version 20240108) # Kicad 8
+	# Format:
 	# (version 20241229) # Kicad 9
 	# (version 20260206) # Kicad 10
 
@@ -1152,13 +1092,6 @@ get_layout_version()
 
 set_default_html_view()
 {
-	local kicad_sch="${1}"
-
-	# Kicad-6 does not have a schematic cli-exporter fully working (only my xdootool script for linux)
-	if [[ $(kicad_version | cut -d"." -f1) == 6 ]]; then
-		START_ON_LAYOUT_VIEW=1
-	fi
-
 	if [[ "${START_ON_LAYOUT_VIEW}" == 1 ]]; then
 		echo "- Setting initial view to layout"
 		sed -i "s/selected_view = \"schematic\";/selected_view = \"layout\";/g" "${WEB_DIR_PATH}/kiri.js"
@@ -1491,34 +1424,6 @@ export_project_files()
 	fi
 }
 
-# Maybe duplicated
-get_kicad_pro_extension()
-{
-	local kicad_project_path="${1}"
-
-	# Find's project version on that commit
-	kicad_pro=$(find "${OUTPUT_DIR_PATH}/${commit_hash}/" -name "*.kicad_pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d" | sort -n | head -n1)
-	if [[ -z ${kicad_pro} ]]; then
-		kicad_pro=$(find "${OUTPUT_DIR_PATH}/${commit_hash}/" -name "*.pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d" | sort -n | head -n1)
-	fi
-
-	get_file_extension "${kicad_pro}"
-}
-
-# Maybe duplicated
-get_kicad_pro_filename()
-{
-	local kicad_project_path="${1}"
-
-	# Find's project version on that commit
-	local kicad_pro=$(find "${OUTPUT_DIR_PATH}/${commit_hash}/" -name "*.kicad_pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d" | sort -n | head -n1)
-	if [[ -z ${kicad_pro} ]]; then
-		local kicad_pro=$(find "${OUTPUT_DIR_PATH}/${commit_hash}/" -name "*.pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d" | sort -n | head -n1)
-	fi
-
-	get_file_without_extention "${kicad_pro}"
-}
-
 parse_schematic_pages()
 {
 	# This function creates a list of pages of the project
@@ -1530,22 +1435,11 @@ parse_schematic_pages()
 	local kicad_sch_dir_path="$(dirname "${kicad_sch}")"
 	local main_page_name="$(get_file_without_extention "${kicad_sch}")"
 	local main_page_basename="$(basename "${kicad_sch}")"
-	local sch_extension="$(get_file_extension "${kicad_sch}")"
 
 	cd ${kicad_sch_dir_path} &> /dev/null || exit
 
-	case ${sch_extension} in
-
-		"sch")
-			pages=($(find_kicad5_sch_hier "${main_page_name}.${sch_extension}"))
-			printf "%s\n" "${pages[@]}"
-			;;
-
-		"kicad_sch")
-			pages=($(find_kicad6_sch_hier "${main_page_name}.${sch_extension}"))
-			printf "%s\n" "${pages[@]}"
-		;;
-	esac
+	pages=($(find_kicad6_sch_hier "${main_page_name}.kicad_sch"))
+	printf "%s\n" "${pages[@]}"
 
 	cd - &> /dev/null || exit
 }
@@ -1562,42 +1456,11 @@ create_project_info()
 	sch_version=$(get_schematic_vesion ${kicad_sch})
 	pcb_version=$(get_layout_version ${kicad_pcb})
 
-	# EESchema Schematic File Version 4
-	# (kicad_sch (version 20211123) (generator eeschema) # Kicad 6
-	# (kicad_sch (version 20230121) (generator eeschema) # Kicad 7
-	# (version 20231120) # Kicad 8
-	# (version 20250114) # Kicad 9
-	# (version 20260101) # Kicad 10
-
-	# (kicad_pcb (version 4) (host kicad "dummy file") )
-	# (kicad_pcb (version 20171130) (host pcbnew "(5.0.0-rc2-76-gb5f63567d)")
-	# (kicad_pcb (version 20171130)	(host pcbnew "(5.1.5)-3")
-	# (kicad_pcb (version 20171130) (host pcbnew "(5.1.6)-1")
-	# (kicad_pcb (version 20171130) (host pcbnew "(5.1.9)-1")
-	# (kicad_pcb (version 20171130) (host pcbnew "(5.1.10)-1")
-	# (kicad_pcb (version 20171130) (host pcbnew 5.0.0-rc3-unknown-eaf938c~65~ubuntu18.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.0.1-33cea8e~67~ubuntu18.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.1.5+dfsg1-2~bpo10+1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.1.6-c6e7f7d~86~ubuntu20.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.1.6-c6e7f7d~87~ubuntu20.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 5.1.7-a382d34a8~87~ubuntu20.04.1)
-	# (kicad_pcb (version 20171130) (host pcbnew 6.0.0-rc1-unknown-da35b16~65~ubuntu18.04.1)
-	# (kicad_pcb (version 20200104) (host pcbnew "(5.99.0-879-ga0698723b)")
-	# (kicad_pcb (version 20211014) (generator pcbnew) # Kicad 6 ??
-	# (kicad_pcb (version 20210606) (generator pcbnew) # Kicad 6
-	# (kicad_pcb (version 20221018) (generator pcbnew) # Kicad 7
-	# (version 20221018) # Kicad 8
+	# Layout file versions:
 	# (version 20241229) # Kicad 9
 	# (version 20260206) # Kicad 10
 
 	case ${pcb_version} in
-		       4) kicad_version="4"    ;;
-		20171130) kicad_version="5"    ;;
-		20200104) kicad_version="5.99" ;;
-		20210606) kicad_version="6"    ;;
-		20211014) kicad_version="6"    ;;
-		20221018) kicad_version="7"    ;;
-		20240108) kicad_version="8"    ;;
 		20241229) kicad_version="9"    ;;
 		20260206) kicad_version="10"   ;;
 		*) kicad_version="Unknown"
@@ -1655,33 +1518,15 @@ parse_layout_layers()
 	# Kicad .kicad_pcb format:
 	# (2 "In2.Cu" power|signal|user hide "Pwr")
 
-	pcb_version=$(get_layout_version ${kicad_pcb})
-
-	if [[ ${pcb_version} -ge 20240108 ]]; then   # (version 20240108) # Kicad 8
-
-		local layers=$( \
-			sed -n '/^\t(layers/,/\t)$/{/^\t(layers/!{/\t)$/!p}}' "${kicad_pcb}" | \
-			sed "s/^[ \t]\+//g" | \
-			sed "s/[()]//g" | \
-			sed "s/\r$//g" | \
-			sed "s/\"//g" | \
-			sed '/^[[:space:]]*$/d' | \
-			sed -r "s/ (signal|user|power|hide)//g" | \
-			awk -F '[ ]' '{if ($3) {printf "%s|%s\n", $1, $3} else {printf "%s|%s\n", $1, $2}}')
-
-	else
-
-		local layers=$( \
-			sed -n '/^  (layers/,/  )$/{/^  (layers/!{/  )$/!p}}' "${kicad_pcb}" | \
-			sed "s/^[ \t]\+//g" | \
-			sed "s/[()]//g" | \
-			sed "s/\r$//g" | \
-			sed "s/\"//g" | \
-			sed '/^[[:space:]]*$/d' | \
-			sed -r "s/ (signal|user|power|hide)//g" | \
-			awk -F '[ ]' '{if ($3) {printf "%s|%s\n", $1, $3} else {printf "%s|%s\n", $1, $2}}')
-
-	fi
+	local layers=$( \
+		sed -n '/^\t(layers/,/\t)$/{/^\t(layers/!{/\t)$/!p}}' "${kicad_pcb}" | \
+		sed "s/^[ \t]\+//g" | \
+		sed "s/[()]//g" | \
+		sed "s/\r$//g" | \
+		sed "s/\"//g" | \
+		sed '/^[[:space:]]*$/d' | \
+		sed -r "s/ (signal|user|power|hide)//g" | \
+		awk -F '[ ]' '{if ($3) {printf "%s|%s\n", $1, $3} else {printf "%s|%s\n", $1, $2}}')
 
 	printf "%s\n" "${layers}"
 }
@@ -1738,11 +1583,17 @@ cmd_run()
 	return ${ret}
 }
 
-manual_schematic_plot()
+generate_schematic_artifacts()
 {
-	local commit_hash="${1}"
-	local kicad_sch="${2}"
-	local kicad_cache_lib="${3}"
+	local commit_hash_1="${1}"
+	local commit_hash_2="${2}"
+	local kicad_sch_1="${3}"
+	local kicad_sch_2="${4}"
+	local i="${5}"
+
+	if [[ "${VERBOSE}" == "1" ]] || [[ "${DEBUG}" == "1" ]]; then
+		echo
+	fi
 
 	local command_end="&> /dev/null"
 
@@ -1752,184 +1603,23 @@ manual_schematic_plot()
 	fi
 
 	# debug shows the whole output
-	if [[ "${DEBUG}" == "1" ]] || [[ "${DEBUG_PLOTGITSCH}" == "1" ]]; then
+	if [[ "${DEBUG}" == "1" ]]; then
 		command_end=""
 	fi
 
-	cd "${OUTPUT_DIR_PATH}/${commit_hash}/" &> /dev/null || exit
+	# Output folders and page lists of both commits
+	local SVG1_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/sch"
+	local SVG2_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/sch"
+	PAGES_FILE_1="${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/sch_sheets"
+	PAGES_FILE_2="${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/sch_sheets"
+	mkdir -p "${SVG1_DIR_PATH}"
+	mkdir -p "${SVG2_DIR_PATH}"
 
-	if [[ "$(get_file_extension "${kicad_sch}")" == "kicad_sch" ]] || [[ ${FORCE_PLOTTING_GRAPHICALLY} == "1" ]]; then
+	# This one is needed only once since it is always the same
+	if [[ "${i}" == "2" ]]; then
 
-		if [[ "${SKIP_KICAD_6}" == "0" ]] && [[ ! "${OSTYPE}" =~ "darwin" ]]; then
-
-			if [[ -z ${PLOT_TIMEOUT} ]]; then
-				PLOT_TIMEOUT=5
-			fi
-
-			msg="# Plotting schematics, ${commit_hash}"
-			cmd="timeout ${PLOT_TIMEOUT} plot_kicad_sch ${kicad_sch}"
-			end="${command_end}"
-			cmd_run "${cmd}" "${msg}" "${end}"
-
-		else
-			if [[ "${SKIP_KICAD_6}" == "1" ]]; then
-				if [[ "${VERBOSE}" = "1" ]] || [[ "${DEBUG}" = "1" ]] || [[ "${DEBUG_PLOTGITSCH}" = "1" ]]; then
-					echo -e "   ${LBL}[Kicad 6] (${commit_hash}) Schematic plot was disabled${RCO}"
-				fi
-			else
-				if [[ "${OSTYPE}" =~ "darwin" ]]; then
-					msg="# Plotting schematics, ${commit_hash}"
-					cmd="plot_kicad_sch_macos ${kicad_sch}"
-					end="${command_end}"
-					cmd_run "${cmd}" "${msg}" "${end}"
-				fi
-			fi
-		fi
-
-	else
-
-		if [[ -f "${kicad_sch}" ]]; then
-
-			all_kicad_sch_files=("${kicad_sch}" $(get_kicad_sch_pages "${kicad_sch}" ${commit_hash}))
-
-			svg_dir_path="${OUTPUT_DIR_PATH}/${commit_hash}/_KIRI_/sch"
-			mkdir -p "${svg_dir_path}"
-
-			IFS=$'\n'
-			for kicad_sch_aux in "${all_kicad_sch_files[@]}"; do
-
-				if [[ ! ${SKIP_CACHE_LIB} == 1 ]]; then
-					# TODO: kicad_cache_lib_1 and kicad_cache_lib_2 may differ
-					if [[ -n "${kicad_cache_lib}" ]]; then
-						local cache_lib_param="-l ${kicad_cache_lib}"
-					fi
-				fi
-
-				if [[ -f "${kicad_cache_lib}" ]]; then
-
-					msg="# Plotting schematics, ${commit_hash}: $(pwd)"
-					cmd="plotkicadsch -f ${kicad_sch_aux} ${cache_lib_param} -o \"${svg_dir_path}\""
-					end="${command_end}"
-					cmd_run "${cmd}" "${msg}" "${end}"
-					ret=${?}
-
-					if [[ "${ret}" == "0" ]]; then
-
-						# TODO: Needs tests, since it may not be generating other pages,
-						# or they may need to have names improved
-						local board_name=$(get_file_without_extention "${kicad_sch_aux}")
-						if [[ -f "${svg_dir_path}/${board_name}.svg" ]]; then
-							# TODO: How to force fix of the viewbox when the images are off center?
-							plotgitsch_svg_tweaks "${svg_dir_path}/${board_name}.svg"| sed "s/^/   ${LGY}| /g" | sed "s/$/${RCO}/g"
-						fi
-
-					else
-
-						if [[ "${SKIP_KICAD_6}" == "0" ]] && [[ ! "${OSTYPE}" =~ "darwin" ]]; then
-
-							if [[ "${DEBUG}" == "1" ]] || [[ "${DEBUG_PLOTGITSCH}" == "1" ]]; then
-								echo -e "    ${LRE}Plotkicadsch has failed. Trying it with xdotool...${RCO}"
-							fi
-
-							PLOTPCB_TIMEOUT=5
-
-							# TESTING: Plokicadsch has failed, then usig GUI
-							# IF THIS IS GOOD. Then it is better to organize this function main_if order here to avoid repetition
-
-							msg="# Plotting schematics, ${commit_hash}"
-							cmd="timeout ${PLOTPCB_TIMEOUT} plot_kicad_sch ${kicad_sch}"
-							end="${command_end}"
-							cmd_run "${cmd}" "${msg}" "${end}"
-
-							break
-
-						else
-
-							if [[ "${OSTYPE}" =~ "darwin" ]]; then
-
-								if [[ "${DEBUG}" == "1" ]] || [[ "${DEBUG_PLOTGITSCH}" == "1" ]]; then
-									echo -e "    ${LRE}Plotkicadsch has failed. Trying it with cliclick...${RCO}"
-								fi
-
-								msg="# Plotting schematics, ${commit_hash}"
-								cmd="plot_kicad_sch_macos ${kicad_sch}"
-								end="${command_end}"
-								cmd_run "${cmd}" "${msg}" "${end}"
-								ret=${?}
-
-								break
-							fi
-						fi
-					fi
-				fi
-			done
-		fi
-	fi
-
-	cd - &> /dev/null || exit
-}
-
-generate_schematic_artifacts()
-{
-	local commit_hash_1="${1}"
-	local commit_hash_2="${2}"
-	local kicad_sch_1="${3}"
-	local kicad_sch_2="${4}"
-	local kicad_cache_lib_1="${5}"
-	local kicad_cache_lib_2="${6}"
-	local i="${7}"
-	local proj_name_1=${8}
-	local proj_name_2=${9}
-
-	if [[ -f $(which kicad-cli 2> /dev/null) ]] \
-	&& [[ $(get_file_extension "${kicad_sch_1}") != "sch" ]] \
-	&& [[ $(get_file_extension "${kicad_sch_2}") != "sch" ]]; then
-
-		if [[ "${VERBOSE}" == "1" ]] || [[ "${DEBUG}" == "1" ]]; then
-			echo
-		fi
-
-		local command_end="&> /dev/null"
-
-		# verbose shows errors only
-		if [[ "${VERBOSE}" == "1" ]]; then
-			command_end="2>&1 >/dev/null"
-		fi
-
-		# debug shows the whole output
-		if [[ "${DEBUG}" == "1" ]]; then
-			command_end=""
-		fi
-
-		# Configure git-imagediff used by plotgitsch
-		export SVG1_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/sch"
-		export SVG2_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/sch"
-		PAGES_FILE_1="${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/sch_sheets"
-		PAGES_FILE_2="${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/sch_sheets"
-		mkdir -p "${SVG1_DIR_PATH}"
-		mkdir -p "${SVG2_DIR_PATH}"
-
-		# This one is needed only once since it is always the same
-		if [[ "${i}" == "2" ]]; then
-
-			msg="# Plotting schematics, ${commit_hash_1}"
-			cmd="kicad-cli sch export svg --black-and-white --no-background-color --output \"${SVG1_DIR_PATH}\" \"${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_sch_1}\""
-			end="${command_end}"
-			cmd_run "${cmd}" "${msg}" "${end}"
-
-			# kicad-cli exports the files using the sheet's title, not its file name
-			original_ifs="${IFS}"
-			IFS="|"
-			while read file_name current_sch_rel uuid instance_name parent_inst; do
-				if [ "${parent_inst}" != "${file_name}" ]; then
-					mv "${SVG1_DIR_PATH}/${parent_inst}.svg" "${SVG1_DIR_PATH}/${file_name}.svg"
-				fi
-			done < "${PAGES_FILE_1}"
-			IFS="${original_ifs}"
-		fi
-
-		msg="# Plotting schematics, ${commit_hash_2}"
-		cmd="kicad-cli sch export svg --black-and-white --no-background-color --output \"${SVG2_DIR_PATH}\" \"${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_sch_2}\""
+		msg="# Plotting schematics, ${commit_hash_1}"
+		cmd="kicad-cli sch export svg --black-and-white --no-background-color --output \"${SVG1_DIR_PATH}\" \"${OUTPUT_DIR_PATH}/${commit_hash_1}/${kicad_sch_1}\""
 		end="${command_end}"
 		cmd_run "${cmd}" "${msg}" "${end}"
 
@@ -1938,89 +1628,26 @@ generate_schematic_artifacts()
 		IFS="|"
 		while read file_name current_sch_rel uuid instance_name parent_inst; do
 			if [ "${parent_inst}" != "${file_name}" ]; then
-				mv "${SVG2_DIR_PATH}/${parent_inst}.svg" "${SVG2_DIR_PATH}/${file_name}.svg"
+				mv "${SVG1_DIR_PATH}/${parent_inst}.svg" "${SVG1_DIR_PATH}/${file_name}.svg"
 			fi
-		done < "${PAGES_FILE_2}"
+		done < "${PAGES_FILE_1}"
 		IFS="${original_ifs}"
-
-	else
-
-		if [[ ! "${PLOTGITSCH_MISSING}" == 1 ]]; then
-
-			if [[ "${VERBOSE}" == "1" ]] || [[ "${DEBUG}" == "1" ]] || [[ "${DEBUG_PLOTGITSCH}" == "1" ]]; then
-				echo
-			fi
-
-			local command_end="&> /dev/null"
-
-			# verbose shows errors only
-			if [[ "${VERBOSE}" == "1" ]]; then
-				command_end="2>&1 >/dev/null"
-			fi
-
-			# debug shows the whole output
-			if [[ "${DEBUG}" == "1" ]] || [[ "${DEBUG_PLOTGITSCH}" == "1" ]]; then
-				command_end=""
-			fi
-
-			# plotgitsch requires an empty string when plotting local changes
-			commit_hash_aux_1="${commit_hash_1}"
-			commit_hash_aux_2="${commit_hash_2}"
-			if [[ "${commit_hash_1}" == "_local_" ]]; then commit_hash_aux_1=""; fi
-			if [[ "${commit_hash_2}" == "_local_" ]]; then commit_hash_aux_2=""; fi
-
-			# When both commits are .sch then use plotgitsch (this already processes all pages)
-			# Skip plotgitsch when both commits are .kicad_sch
-			# Then plotkicadsch for each .sch (processing all pages) and skip .kicad_sch files
-
-			local kicad_sch_extension_1=$(get_file_extension "${kicad_sch_1}")
-			local kicad_sch_extension_2=$(get_file_extension "${kicad_sch_2}")
-
-			if { [[ "${kicad_sch_extension_1}" == "sch" ]] && [[ "${kicad_sch_extension_2}" == "sch" ]]; } && [[ "${FORCE_PLOTTING_GRAPHICALLY}" == "0" ]]; then
-
-				local removed_color="FF0000"
-				local added_color="008FFF"
-				local unchanged_color="FFFFFF"
-				local background_color="222222"
-				local color_scheme="-c ${removed_color}:${added_color}:${unchanged_color}:${background_color} ${commit_hash_aux_1} ${commit_hash_aux_2}"
-
-				if [[ "${KICAD_PROJ_NESTED_PATH}" != "." ]]; then
-					relative_path="-r ${KICAD_PROJ_NESTED_PATH}"
-				fi
-
-				if [[ ! ${SKIP_CACHE_LIB} == 1 ]]; then
-					# TODO: kicad_cache_lib_1 and kicad_cache_lib_2 may differ
-					if [[ -f "${kicad_cache_lib_1}" ]]; then
-						cache_lib="-l ${kicad_cache_lib_1}"
-					else
-						if [[ -f "${kicad_cache_lib_2}" ]]; then
-							cache_lib="-l ${kicad_cache_lib_2}"
-						fi
-					fi
-				fi
-
-				# Configure git-imagediff used by plotgitsch
-				export IMGDIFF_SVG1_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_1}/_KIRI_/sch"
-				export IMGDIFF_SVG2_DIR_PATH="${OUTPUT_DIR_PATH}/${commit_hash_2}/_KIRI_/sch"
-				mkdir -p "${IMGDIFF_SVG1_DIR_PATH}"
-				mkdir -p "${IMGDIFF_SVG2_DIR_PATH}"
-
-				msg="# Plotting schematics, ${commit_hash_1}, ${commit_hash_2}"
-				cmd="plotgitsch --keep --allow_missing ${relative_path} ${cache_lib} ${color_scheme}"
-				end="${command_end}"
-				cmd_run "${cmd}" "${msg}" "${end}"
-
-			else
-
-				# This one is needed only once since it is always the same
-				if [[ "${i}" == "2" ]]; then
-					manual_schematic_plot "${commit_hash_1}" "${kicad_sch_1}" "${kicad_cache_lib_1}"
-				fi
-				manual_schematic_plot "${commit_hash_2}" "${kicad_sch_2}" "${kicad_cache_lib_2}"
-
-			fi
-		fi
 	fi
+
+	msg="# Plotting schematics, ${commit_hash_2}"
+	cmd="kicad-cli sch export svg --black-and-white --no-background-color --output \"${SVG2_DIR_PATH}\" \"${OUTPUT_DIR_PATH}/${commit_hash_2}/${kicad_sch_2}\""
+	end="${command_end}"
+	cmd_run "${cmd}" "${msg}" "${end}"
+
+	# kicad-cli exports the files using the sheet's title, not its file name
+	original_ifs="${IFS}"
+	IFS="|"
+	while read file_name current_sch_rel uuid instance_name parent_inst; do
+		if [ "${parent_inst}" != "${file_name}" ]; then
+			mv "${SVG2_DIR_PATH}/${parent_inst}.svg" "${SVG2_DIR_PATH}/${file_name}.svg"
+		fi
+	done < "${PAGES_FILE_2}"
+	IFS="${original_ifs}"
 
 	if which svgo &> /dev/null; then
 		if [[ -z ${DO_NOT_OPTIMIZE_SVG} ]]; then
@@ -2036,10 +1663,6 @@ generate_schematic_artifacts()
 			cmd_run "${cmd}" "${msg}" "${end}"
 		fi
 	fi
-
-	# if [[ "${VERBOSE}" == "1" ]] || [[ "${DEBUG}" == "1" ]] || [[ "${DEBUG_PLOTGITSCH}" == "1" ]]; then
-		# echo
-	# fi
 }
 
 kicad_cli_has_multi_mode()
@@ -2412,13 +2035,12 @@ generate_diffs()
 					local kicad_sch_1="$(get_kicad_sch "${OUTPUT_DIR_PATH}/${hash_1}" "${kicad_project_name_1}" "${kicad_pro_extension_1}")"
 					local kicad_pcb_1="$(get_kicad_pcb "${OUTPUT_DIR_PATH}/${hash_1}" "${kicad_project_name_1}")"
 					local kicad_sch_pages_1="$(get_kicad_sch_pages "${OUTPUT_DIR_PATH}/${hash_1}/${kicad_sch_1}" ${hash_1})"
-					local kicad_cache_lib_1="$(get_kicad_cache_lib "${OUTPUT_DIR_PATH}/${hash_1}" "${kicad_project_name_1}")"
 
 					if [[ "${VERBOSE}" == "1" ]] || [[ "${DEBUG}" == "1" ]]; then
 						echo
 					fi
 
-					show_project_files "${OUTPUT_DIR_PATH}/${hash_1}" "${kicad_pro_1}" "${kicad_sch_1}" "${kicad_pcb_1}" "${kicad_cache_lib_1}"
+					show_project_files "${OUTPUT_DIR_PATH}/${hash_1}" "${kicad_pro_1}" "${kicad_sch_1}" "${kicad_pcb_1}"
 					create_project_info  "${hash_1}" "${OUTPUT_DIR_PATH}/${hash_1}/${kicad_pro_1}" "${OUTPUT_DIR_PATH}/${hash_1}/${kicad_sch_1}" "${OUTPUT_DIR_PATH}/${hash_1}/${kicad_pcb_1}"
 					create_list_of_pages "${hash_1}" "${OUTPUT_DIR_PATH}/${hash_1}/${kicad_sch_1}"
 					create_list_of_layers "${hash_1}" "${OUTPUT_DIR_PATH}/${hash_1}/${kicad_pcb_1}"
@@ -2435,18 +2057,17 @@ generate_diffs()
 				local kicad_sch_2="$(get_kicad_sch "${OUTPUT_DIR_PATH}/${hash_2}" "${kicad_project_name_2}" "${kicad_pro_extension_2}")"
 				local kicad_pcb_2="$(get_kicad_pcb "${OUTPUT_DIR_PATH}/${hash_2}" "${kicad_project_name_2}")"
 				local kicad_sch_pages_2="$(get_kicad_sch_pages "${OUTPUT_DIR_PATH}/${hash_2}/${kicad_sch_2}" ${hash_2})"
-				local kicad_cache_lib_2="$(get_kicad_cache_lib "${OUTPUT_DIR_PATH}/${hash_2}" "${kicad_project_name_2}")"
 
 				if [[ "${VERBOSE}" == "1" ]] || [[ "${DEBUG}" == "1" ]]; then
 					echo
 				fi
 
-				show_project_files "${OUTPUT_DIR_PATH}/${hash_2}" "${kicad_pro_2}" "${kicad_sch_2}" "${kicad_pcb_2}" "${kicad_cache_lib_2}"
+				show_project_files "${OUTPUT_DIR_PATH}/${hash_2}" "${kicad_pro_2}" "${kicad_sch_2}" "${kicad_pcb_2}"
 				create_project_info "${hash_2}" "${OUTPUT_DIR_PATH}/${hash_2}/${kicad_pro_2}" "${OUTPUT_DIR_PATH}/${hash_2}/${kicad_sch_2}" "${OUTPUT_DIR_PATH}/${hash_2}/${kicad_pcb_2}"
 				create_list_of_pages "${hash_2}" "${OUTPUT_DIR_PATH}/${hash_2}/${kicad_sch_2}"
 				create_list_of_layers "${hash_2}" "${OUTPUT_DIR_PATH}/${hash_2}/${kicad_pcb_2}"
 
-				generate_schematic_artifacts "${hash_1}" "${hash_2}" "${kicad_sch_1}" "${kicad_sch_2}" "${kicad_cache_lib_1}" "${kicad_cache_lib_2}" "${i}" "${kicad_project_name_1}" "${kicad_project_name_2}"
+				generate_schematic_artifacts "${hash_1}" "${hash_2}" "${kicad_sch_1}" "${kicad_sch_2}" "${i}"
 				generate_layout_artifacts "${hash_1}" "${hash_2}" "${kicad_pcb_1}" "${kicad_pcb_2}" "${kicad_project_name_1}" "${kicad_project_name_2}"
 
 				if [[ -n ${SCH_SVG_VIEWBOX_XY} ]]; then
@@ -2525,8 +2146,7 @@ build_main_html()
 	local kicad_sch="$(get_kicad_sch "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}" "${kicad_pro_extension}")"
 	local kicad_pcb="$(get_kicad_pcb "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}")"
 	local kicad_sch_pages="$(get_kicad_sch_pages "${KICAD_PROJ_ABSOLUTE_PATH}/${kicad_sch}")"
-	local kicad_cache_lib="$(get_kicad_cache_lib "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}")"
-	show_project_files "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}" "${kicad_cache_lib}"
+	show_project_files "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}"
 
 	mkdir -p "${WEB_DIR_PATH}/"
 
@@ -2646,7 +2266,7 @@ build_main_html()
 	sed -i "s|\[COMMIT_2_KICAD_PRO\]|${project_path_2}|g" "${WEB_DIR_PATH}/${main_html}"
 
 	# Change initial view to layout
-	set_default_html_view "${kicad_sch}"
+	set_default_html_view
 }
 
 archive_kiri_website()
@@ -2693,12 +2313,8 @@ get_kicad_pro()
 
 		# echo "Missing missing ${KICAD_PRO_FILENAME_HEAD}, it was moved or renamed"
 		# Poor way to try guessing the filename when it was removed/renamed
-		# Initially form .pro to .kicad_pro
 
 		local kicad_pro="$(find "${kicad_proj_path}" -maxdepth 1 -name "*.kicad_pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d")"
-		if [[ -z "${kicad_pro}" ]]; then
-			kicad_pro="$(find "${kicad_proj_path}" -maxdepth 1 -name "*.pro" | sed "/${KICAD_PRO_FIND_EXCLUDE_PATTERN}/d")"
-		fi
 	fi
 
 	basename "${kicad_pro}"
@@ -2711,9 +2327,6 @@ get_kicad_sch()
 	local kicad_pro_extension="${3}"
 	local kicad_sch
 	case "${kicad_pro_extension}" in
-		"pro")
-			basename "$(find "${kicad_proj_path}" -maxdepth 1 -name "${kicad_proj_name}\.sch")"
-			;;
 		"kicad_pro")
 			basename "$(find "${kicad_proj_path}" -maxdepth 1 -name "${kicad_proj_name}\.kicad_sch")"
 			;;
@@ -2735,20 +2348,10 @@ get_kicad_sch_pages()
 	fi
 
 	case "${sch_extension}" in
-		"sch")
-			git ls-tree -r --name-only "${git_hash}" | grep "\.sch$" | sed "s|${kicad_sch}||g"
-			;;
 		"kicad_sch")
 			git ls-tree -r --name-only "${git_hash}" | grep "\.kicad_sch$" | sed "s|${kicad_sch}||g"
 			;;
 	esac
-}
-
-get_kicad_cache_lib()
-{
-	local kicad_proj_path="${1}"
-	local kicad_proj_name="${2}"
-	basename "$(find "${kicad_proj_path}" -maxdepth 1 -name "${kicad_proj_name}-cache.lib")" 2> /dev/null
 }
 
 get_kicad_pcb()
@@ -2764,7 +2367,6 @@ show_project_files()
 	local kicad_pro="${2}"
 	local kicad_sch="${3}"
 	local kicad_pcb="${4}"
-	local kicad_cache_lib="${5}"
 
 	local kicad_sch_pages="$(get_kicad_sch_pages "${kicad_project_path}/${kicad_sch}")"
 	local extra_kicad_sch_pages=$(echo "${kicad_sch_pages}" | sed "s/${kicad_sch}//g" 2> /dev/null | sed '/^[[:space:]]*$/d')
@@ -2784,9 +2386,6 @@ show_project_files()
 			padding=$(printf ' %.0s' {1..19})
 			echo -e "${indent}  extra_sch_files: $(echo -e "${extra_kicad_sch_pages}" | sed "s/^/${indent}${padding}/g" | sed '1s/[ ]\+//')"
 		fi
-		if [[ -n "${kicad_cache_lib}" ]]; then
-			echo -e "${indent}        cache.lib: ${kicad_cache_lib}"
-		fi
 		echo "${indent}           layout: ${kicad_pcb}"
 		echo
 	fi
@@ -2794,7 +2393,7 @@ show_project_files()
 
 show_main_global_variables()
 {
-	if [[ "${VERBOSE}" == 1 ]] || [[ "${DEBUG}" == 1 ]] || [[ "${DEBUG_KIDIFF}" == 1 ]] || [[ "${DEBUG_PLOTGITSCH}" == 1 ]]; then
+	if [[ "${VERBOSE}" == 1 ]] || [[ "${DEBUG}" == 1 ]] || [[ "${DEBUG_KIDIFF}" == 1 ]]; then
 		(
 			echo
 			echo "          KIRI_HOME_PATH = ${KIRI_HOME_PATH}"
@@ -2835,9 +2434,8 @@ main()
 	local kicad_sch="$(get_kicad_sch "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}" "${kicad_pro_extension}")"
 	local kicad_pcb="$(get_kicad_pcb "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}")"
 	local kicad_sch_pages="$(get_kicad_sch_pages "${KICAD_PROJ_ABSOLUTE_PATH}/${kicad_sch}")"
-	local kicad_cache_lib="$(get_kicad_cache_lib "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_proj_name}")"
 
-	show_project_files "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}" "${kicad_cache_lib}"
+	show_project_files "${KICAD_PROJ_ABSOLUTE_PATH}" "${kicad_pro}" "${kicad_sch}" "${kicad_pcb}"
 
 	echo -e "\n${LBL}Output folder:${RCO} ${OUTPUT_DIR_PATH}"
 
