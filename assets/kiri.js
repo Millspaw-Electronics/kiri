@@ -771,7 +771,7 @@ function update_sheets_list(commit1, commit2) {
         var input_html = `
         <input id="${sheet}" data-toggle="tooltip" title="${sheet}" type="radio" value="${sheet}" name="pages" onchange="update_page()">
             <label for="${sheet}" data-toggle="tooltip" title="${sheet}" id="label-${sheet}" class="rounded text-sm-left list-group-item radio-box" onclick="update_page_onclick()" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                <span data-toggle="tooltip" title="${sheet}" style="margin-left:0.5em; margin-right:0.1em;" class="iconify" data-icon="gridicons:pages" data-inline="false"></span>
+                <span data-toggle="tooltip" title="${sheet}" style="margin-left:0.5em; margin-right:0.1em;" class="iconify" data-icon="bi:file-earmark" data-inline="false"></span>
                 ${sheet}
             </label>
         </label>
@@ -821,66 +821,35 @@ function update_sheets_list(commit1, commit2) {
     }
 }
 
-function layer_color(layer_id) {
+function layer_color(layer_name) {
 
-    var color;
-
-    console.log(">>> layer_id", layer_id);
-
-    const F_Cu      = 0;
-    const In1_Cu    = 1;
-    const In2_Cu    = 2;
-    const In3_Cu    = 3;
-    const In4_Cu    = 4;
-    const B_Cu      = 31;
-    const B_Adhes   = 32;
-    const F_Adhes   = 33;
-    const B_Paste   = 34;
-    const F_Paste   = 35;
-    const B_SilkS   = 36;
-    const F_SilkS   = 37;
-    const B_Mask    = 38;
-    const F_Mask    = 39;
-    const Dwgs_User = 40;
-    const Cmts_User = 41;
-    const Eco1_User = 42;
-    const Eco2_User = 43;
-    const Edge_Cuts = 44;
-    const Margin    = 45;
-    const B_CrtYd   = 46;
-    const F_CrtYd   = 47;
-    const B_Fab     = 48;
-    const F_Fab     = 49;
-
-    switch(layer_id) {
-        case B_Adhes:   color="#3545A8"; break;
-        case B_CrtYd:   color="#D3D04B"; break;
-        case B_Cu:      color="#359632"; break;
-        case B_Fab:     color="#858585"; break;
-        case B_Mask:    color="#943197"; break;
-        case B_Paste:   color="#969696"; break;
-        case B_SilkS:   color="#481649"; break;
-        case Cmts_User: color="#7AC0F4"; break;
-        case Dwgs_User: color="#0364D3"; break;
-        case Eco1_User: color="#008500"; break;
-        case Eco2_User: color="#008500"; break;
-        case Edge_Cuts: color="#C9C83B"; break;
-        case F_Adhes:   color="#A74AA8"; break;
-        case F_CrtYd:   color="#A7A7A7"; break;
-        case F_Cu:      color="#952927"; break;
-        case F_Fab:     color="#C2C200"; break;
-        case F_Mask:    color="#943197"; break;
-        case F_Paste:   color="#3DC9C9"; break;
-        case F_SilkS:   color="#339697"; break;
-        case In1_Cu:    color="#C2C200"; break;
-        case In2_Cu:    color="#C200C2"; break;
-        case In3_Cu:    color="#C20000"; break;
-        case In4_Cu:    color="#0000C2"; break;
-        case Margin:    color="#D357D2"; break;
-        default:        color="#DBDBDB";
+    // By name, since KiCad 9 renumbered the layers
+    switch(layer_name) {
+        case "F.Cu":                          return "#952927";
+        case "B.Cu":                          return "#359632";
+        case "In1.Cu":                        return "#C2C200";
+        case "In2.Cu":                        return "#C200C2";
+        case "In3.Cu":                        return "#C20000";
+        case "In4.Cu":                        return "#0000C2";
+        case "F.Adhesive":   case "F.Adhes":  return "#A74AA8";
+        case "B.Adhesive":   case "B.Adhes":  return "#3545A8";
+        case "F.Paste":                       return "#3DC9C9";
+        case "B.Paste":                       return "#969696";
+        case "F.Silkscreen": case "F.SilkS":  return "#339697";
+        case "B.Silkscreen": case "B.SilkS":  return "#481649";
+        case "F.Mask":       case "B.Mask":   return "#943197";
+        case "User.Drawings": case "Dwgs.User": return "#0364D3";
+        case "User.Comments": case "Cmts.User": return "#7AC0F4";
+        case "User.Eco1": case "Eco1.User":
+        case "User.Eco2": case "Eco2.User":   return "#008500";
+        case "Edge.Cuts":                     return "#C9C83B";
+        case "Margin":                        return "#D357D2";
+        case "F.Courtyard":  case "F.CrtYd":  return "#A7A7A7";
+        case "B.Courtyard":  case "B.CrtYd":  return "#D3D04B";
+        case "F.Fab":                         return "#C2C200";
+        case "B.Fab":                         return "#858585";
+        default:                              return "#DBDBDB";
     }
-
-    return color;
 }
 
 function pad(num, size)
@@ -928,14 +897,11 @@ function update_layers_list(commit1, commit2, selected_layer_idx, selected_layer
     used_layers_1 = loadFile("../" + commit1 + "/_KIRI_/pcb_layers" + url_timestamp(commit1)).split("\n").filter((a) => a);
     used_layers_2 = loadFile("../" + commit2 + "/_KIRI_/pcb_layers" + url_timestamp(commit2)).split("\n").filter((a) => a);
 
-    for (const line of used_layers_1)
-    {
-        id = line.split("|")[0];
-        layer = line.split("|")[1]; //.replace(".", "_");
-        dict[id] = [layer];
-    }
+    // Keep the layers in the order the board lists them. (Object keys that are
+    // numbers are always sorted, and KiCad 9's layer numbers aren't in board order.)
+    var layer_order = [];
 
-    for (const line of used_layers_2)
+    for (const line of used_layers_1.concat(used_layers_2))
     {
         id = line.split("|")[0];
         layer = line.split("|")[1]; //.replace(".", "_");
@@ -943,23 +909,25 @@ function update_layers_list(commit1, commit2, selected_layer_idx, selected_layer
         // Add new key
         if (! dict.hasOwnProperty(id)) {
             dict[id] = [layer];
+            layer_order.push(id);
         }
         else {
             // Append if id key exists
-            if (dict[id] != layer) {
+            if (! dict[id].includes(layer)) {
                 dict[id].push(layer);
             }
         }
     }
 
-    console.log("[PCB] Layers =", Object.keys(dict).length);
+    console.log("[PCB] Layers =", layer_order.length);
 
-    for (const [layer_id, layer_names] of Object.entries(dict))
+    for (const layer_id of layer_order)
     {
+        var layer_names = dict[layer_id];
         id = parseInt(layer_id);
         id_pad = pad(id, 2);
         layer_name = layer_names[0];
-        color = layer_color(id);
+        color = layer_color(layer_name);
 
         var input_html = `
         <!-- Generated Layer ${id} -->
@@ -1750,6 +1718,20 @@ function toggle_fullscreen()
     is_fullscreen = true;
     update_fullscreen_label()
   }
+}
+
+// "Launch KiCad at this Rev": the KiRI Windows app handles it itself,
+// otherwise kiri-server does
+function launch_kicad(form_id, hash_input_id)
+{
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage({
+            action: "launch_kicad",
+            hash: document.getElementById(hash_input_id).value
+        });
+    } else {
+        document.getElementById(form_id).submit();
+    }
 }
 
 function show_info_popup()

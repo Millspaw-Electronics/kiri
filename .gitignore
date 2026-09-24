@@ -1,1 +1,8 @@
 .kiri
+.claude/
+
+# Windows app build output
+windows/**/bin/
+windows/**/obj/
+windows/publish/
+windows/dist/
