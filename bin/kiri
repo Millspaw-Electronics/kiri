@@ -208,7 +208,7 @@ insert_pages_html()
 		<!-- Page ${i} -->
 		<input id="${page_name}" data-toggle="tooltip" title="${page_filename_path}" type="radio" value="${page_filename}" name="pages" ${checked} onchange="change_page()">
 		<label for="${page_name}" data-toggle="tooltip" title="${page_filename_path}" id="label-${page_name}" class="rounded text-sm-left list-group-item radio-box" onclick="change_page_onclick()" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-		    <span data-toggle="tooltip" title="${page_filename_path}" style="margin-left:0.5em; margin-right:0.1em;" class="iconify" data-icon="gridicons:pages" data-inline="false"></span>
+		    <span data-toggle="tooltip" title="${page_filename_path}" style="margin-left:0.5em; margin-right:0.1em;" class="iconify" data-icon="bi:file-earmark" data-inline="false"></span>
 		    ${page_name}
 		</label>
 		EOM
@@ -1865,6 +1865,7 @@ build_main_html()
 	cp -f "${KIRI_HOME_PATH}/assets/kiri.css"      "${WEB_DIR_PATH}/"
 	cp -f "${KIRI_HOME_PATH}/assets/blank.svg"     "${WEB_DIR_PATH}/"
 	cp -f "${KIRI_HOME_PATH}/assets/favicon.ico"   "${WEB_DIR_PATH}/"
+	cp -rf "${KIRI_HOME_PATH}/assets/vendor"       "${WEB_DIR_PATH}/"
 	cp -f "${KIRI_HOME_PATH}/assets/redirect.html" "${WEB_DIR_PATH}/../index.html"
 	cp -f "${KIRI_HOME_PATH}/bin/kiri-server"      "${OUTPUT_DIR_PATH}/"
 

@@ -1,0 +1,5 @@
+# Shell and Python scripts must keep LF line endings to run on Linux/WSL,
+# even from a Windows checkout with core.autocrlf
+bin/* text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
