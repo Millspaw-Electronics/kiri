@@ -7,6 +7,8 @@
 
 Millspaw Electronics uses KiRI on KiCad 10 projects that are stored on Windows and checked out with Git for Windows, with KiRI running in WSL2 Ubuntu. That setup hit problems the upstream version doesn't handle. We fixed them in KiRI itself rather than keep a separate patch script, so the fixes are versioned and every install gets them. The fork changes:
 
+- **KiCad 9 or newer only.** The fork plots schematics and layouts only with KiCad's `kicad-cli`, and drops upstream's support for older KiCad versions: `plotgitsch`/`plotkicadsch` for KiCad 5 projects (`.pro`/`.sch`), GUI scripting with `xdotool`/`cliclick` for KiCad 6, KiCad-Diff for layouts, the `svgo` optimisation step, and the KiCad 5 and 6 PCB editor plugins. The options that went with them (`-s`, `-6`, `-dp`, `-dk`) are gone; `-k` and `-R` are still accepted but do nothing.
+
 - **CRLF line endings in the working copy.** KiRI converts Windows (CRLF) line endings in the uncommitted working copy (`_local_`) before parsing it, but only for files that `file` reports as *ASCII* text. KiCad 10 board files often contain UTF-8 characters, so they were skipped. The layer parser then read the whole board file, including embedded images, as a list of layers: about 340,000 “layers” on one project, and KiRI appeared to hang. The fork converts any text file with CRLF endings.
 - **Commits from all branches.** Upstream lists only the commits on the checked-out branch. The fork lists commits from every local and remote branch by default. Set `KIRI_BRANCHES` to narrow the list, for example `KIRI_BRANCHES="main my-feature" kiri ...`. Any revisions `git log` accepts work.
 - **KiCad text variables in the page header.** The web page header shows the schematic and PCB title, revision and date copied straight from the title block. Projects that use KiCad text variables, such as `${PROJECT_TITLE}`, showed the variable names. The fork fills in the values from the project's `.kicad_pro`, including variables that contain other variables. It also strips the stray carriage return that CRLF files left at the end of each value.
@@ -14,10 +16,10 @@ Millspaw Electronics uses KiRI on KiCad 10 projects that are stored on Windows a
 - **Commit messages with quotes.** Upstream inserted commit messages into the page unescaped, so a message containing `"` broke the commit list. The fork escapes them.
 - **Long titles** in the page header wrap instead of being cut off.
 - **Quieter output on the Windows drive.** Running on a project under `/mnt/c` in WSL, upstream printed a harmless `tar: … Cannot utime` or `sed: preserving permissions` warning for nearly every file. The fork no longer triggers or shows them.
-- **One installer.** `install_kiri.sh` replaces upstream's separate `install_dependencies.sh` and `install_kiri.sh`. It installs the system packages, KiCad 10 from KiCad's PPA on Ubuntu, KiRI and the KiCad plugin, and sets up `~/.bashrc`. Python packages come from Ubuntu's own packages, since system-wide `pip` installs are blocked on current Ubuntu. Building `plotgitsch`, only needed for KiCad 5 schematics, is now optional. The installer clones from this fork. See [INSTALL.md](INSTALL.md).
-- **Faster layout plotting.** Upstream runs `kicad-cli` once per layer, and every run spends about 2 seconds starting KiCad and loading the board. The fork plots all layers of a commit in one `kicad-cli --mode-multi` run (KiCad 9 and later), and falls back to one run per layer with older KiCad. On a 4-commit, 29-layer project a full build went from about 5 minutes to about 20 seconds.
+- **One installer.** `install_kiri.sh` replaces upstream's separate `install_dependencies.sh` and `install_kiri.sh`. It installs the system packages, KiCad 10 from KiCad's PPA on Ubuntu and KiRI, and sets up `~/.bashrc`. Python packages come from Ubuntu's own packages, since system-wide `pip` installs are blocked on current Ubuntu. The installer clones from this fork. See [INSTALL.md](INSTALL.md).
+- **Faster layout plotting.** Upstream runs `kicad-cli` once per layer, and every run spends about 2 seconds starting KiCad and loading the board. The fork plots all layers of a commit in one `kicad-cli --mode-multi` run (KiCad 9 and later). On a 4-commit, 29-layer project a full build went from about 5 minutes to about 20 seconds.
 - **Output outside the project.** Upstream writes its output to `.kiri` in the project folder, where it shows up as changes in Git. The fork writes to `~/.cache/kiri/<project>-<id>` (respecting `XDG_CACHE_HOME`). `-d .kiri` restores the old location. In WSL this also keeps the output off the slower Windows drive.
-- **`kiri-headless`** runs `kiri -k -S -p 8080`: plot layouts with `kicad-cli`, start the web server without opening a browser, and keep the same address. It passes any other options through, for example `kiri-headless -r board.kicad_pro`.
+- **`kiri-headless`** runs `kiri -S -p 8080`: start the web server without opening a browser, and keep the same address. It passes any other options through, for example `kiri-headless -r board.kicad_pro`.
 
 To pull in upstream changes:
 
@@ -34,19 +36,9 @@ Millspaw's full WSL2 setup procedure is in `Kiri_Setup_Guide.md` in the Millspaw
 KiRI started as a script to experiment having a visual diff tool for KiCad projects including schematics and layouts.
 After some time, it became an interesting and it is still being updated.
 
-Currently, KiRi supports KiCad >= 5.
+This fork of KiRI supports KiCad 9 and newer.
 
-Internally it uses existing tools to generate svg images of schematics and layouts to be compared.
-
-In this way, when exporting schematics, if:
-
-- KiCad >= 7 is installed, the `kicad-cli` is used.
-- KiCad 6 is installed (which does not have `kicad-cli` available), schematics are exported using [xdotool](https://github.com/jordansissel/xdotool) on Linux/Windows and [cliclick](https://github.com/BlueM/cliclick) on macOS, using the GUI. This method is far from the ideal and it is not recommended.
-- KiCad 5 is installed or if the projects is based on KiCad 5, [plotkicadsch/plotgitsch](https://github.com/jnavila/plotkicadsch) are used to export the schematics.
-
-However, when exporting the layout layers:
-
-- [Kicad-Diff](https://github.com/Gasman2014/KiCad-Diff) is used for all supported KiCad versions using `pcbnew` library available in python. It is also possible to use `kicad-cli` to export the layout layers however this process is slower than using Kicad-Diff since the other exports all the layers at once and `kicad-cli` can only do one layer at a time.
+Internally it uses KiCad's `kicad-cli` to generate svg images of the schematics (every sheet) and the layout (one image per layer) of each revision, to be compared.
 
 
 ## KiRI Installation
@@ -62,7 +54,7 @@ KiRI can be launched with the following command, anywhere, inside or outside of 
 kiri [OPTIONS] [KICAD_PROJECT_FILE]
 ```
 
-`KICAD_PROJECT_FILE` can be passed, but it can also be omitted. If running from inside the project's repository, it will use the `.pro` or `.kicad_pro` available. If both are present (which is not good), it will ask your choice. The same happens is running outside of the repository without passing the `KICAD_PROJECT_FILE`.
+`KICAD_PROJECT_FILE` (a `.kicad_pro` file) can be passed, but it can also be omitted. If it is omitted, KiRI uses the `.kicad_pro` in the current folder.
 
 
 ## Command line options (aka Help)
@@ -84,19 +76,6 @@ cd kiri
 ./kiri-server .
 ```
 
-# KiCad Integration
-
-It is possible to integrate KiRI with PCBNew by adding a button to its toolbar with the following command:
-
-```bash
-# Create folder if it does not exist
-mkdir -p "~/.kicad/scripting/plugins"
-
-# Copy the plugin there
-cd ./kiri
-cp -r "./kicad/plugin/kiri_v6/" "~/.kicad/scripting/plugins/kiri"
-```
-
 # KiRI Screenshots
 
 Browsing the schematic view walking through and comparing each page of the schematics, individually.
@@ -109,12 +88,6 @@ Browsing the layout view walking through and comparing each layer of the layout,
 
 <p align="center">
     <img src="misc/kiri_pcb.png" width="820" alt="Layout View">
-</p>
-
-Here is the comparison of the schematics when the project is updated from using KiCad 5 (`.sch`) to KiCad 6 (`.kicad_sch`).
-
-<p align="center">
-    <img src="misc/kicad_sch_v6.png" width="820" alt="Layout View">
 </p>
 
 Shortcuts are a really good way of walking through the commits, pages and layers quickly. Check the available shortcuts by hitting the shortcut `i`.

@@ -10,7 +10,7 @@ def open_project_dialog(current_path):
 
     title = "KiRI - Select Kicad Project"
 
-    file_wildcards = "Kicad Project (*.pro;*.kicad_pro)|*.pro;*.kicad_pro|All files (*)|*"
+    file_wildcards = "Kicad Project (*.kicad_pro)|*.kicad_pro|All files (*)|*"
 
     with wx.FileDialog(frame, title, "", "", file_wildcards,
         wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
