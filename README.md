@@ -3,6 +3,14 @@
 > **This is Millspaw Electronics' fork of [leoheck/kiri](https://github.com/leoheck/kiri).**
 > All credit for KiRI goes to Leandro Heck and its other contributors. The original README follows the fork notes below.
 
+## Windows app
+
+The fork includes a native Windows 11 app, so KiRI no longer needs WSL on Windows. Install it with `KiRI-Setup-<version>.exe`, open **KiRI** from the Start menu, and choose a Git repository folder that contains a KiCad 9 or newer project. KiRI plots every commit that changes the schematic or layout, plus any uncommitted changes, and opens the viewer in its own window. **File → Refresh** (F5) picks up new commits and local changes; only those are plotted again.
+
+The app needs Git (Git for Windows or GitHub Desktop) and KiCad 9 or newer. It finds both automatically, and you can point it at other copies on its start page. The installer can also add **Open in KiRI** to the right-click menu of folders. Generated files go to `%LOCALAPPDATA%\kiri`.
+
+`kiri-cli.exe`, installed next to the app, builds the same output from the command line; run `kiri-cli --help` for its options. The source and build instructions are in [windows/README.md](windows/README.md).
+
 ## About this fork
 
 Millspaw Electronics uses KiRI on KiCad 10 projects that are stored on Windows and checked out with Git for Windows, with KiRI running in WSL2 Ubuntu. That setup hit problems the upstream version doesn't handle. We fixed them in KiRI itself rather than keep a separate patch script, so the fixes are versioned and every install gets them. The fork changes:

@@ -1,6 +1,6 @@
 # Plan: porting KiRI's generator off bash
 
-*Status: proposal, not started. Written September 2026 against this fork at the commit that added `--mode-multi` plotting and the `~/.cache/kiri` output folder.*
+*Status: Phases 1–3 done for Windows (September 2026). The generator was ported to C# (.NET 8) rather than Node or Python, with a WinForms + WebView2 app and an Inno Setup installer; see `windows/README.md`. It writes the same output layout as the bash version instead of a `manifest.json`, so the bash version (kept for Linux/WSL, now KiCad 9+ only) shares the viewer. The rest of this document is the original proposal.*
 
 ## Goal
 
