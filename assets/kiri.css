@@ -69,19 +69,52 @@ html, body {
 }
 
 .list-group input[type="checkbox"]:checked + .list-group-item {
-	background-color: #3d4650;
-	color: #fff;
+	background-color: #e9ecef;
+	color: #1a1a1a;
 	border-radius: 5px;
-	border-left-color: #8fa3b8;
+	border-left-color: #6c757d;
 }
 
 /* The two selected commits are marked with their colours in the diff */
 .list-group input[type="checkbox"]:checked + .list-group-item.commit-newer {
-	border-left-color: #00b8b8;
+	border-left-color: #008c8c;
 }
 
 .list-group input[type="checkbox"]:checked + .list-group-item.commit-older {
-	border-left-color: #e03030;
+	border-left-color: #d00000;
+}
+
+/* Darker text and icon colours so they read on the light background */
+.list-group input[type="checkbox"]:checked + .list-group-item .text-muted {
+	color: #555 !important;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item .text-success {
+	color: #1e7b34 !important;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item .text-info {
+	color: #0b5563 !important;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item .text-warning {
+	color: #8a5300 !important;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item .iconify--carbon {
+	color: #4d7a00 !important;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item .iconify--codicon {
+	color: #c2185b !important;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item .iconify--bi {
+	color: #555 !important;
+}
+
+.list-group input[type="checkbox"]:checked + .list-group-item .iconify--bx {
+	color: #d00000 !important;
 }
 
 .list-group input[type="checkbox"]:checked + .list-group-item:before {
@@ -156,8 +189,8 @@ html, body {
 }
 
 .list-group input[type="radio"]:checked + .list-group-item {
-	background-color: #3d4650;
-	color: #FFF;
+	background-color: #e9ecef;
+	color: #1a1a1a;
 }
 
 .list-group input[type="radio"]:checked + .list-group-item:before {
