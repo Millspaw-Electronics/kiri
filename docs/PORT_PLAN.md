@@ -47,7 +47,7 @@ Nothing the generator does needs a particular language. It runs `git` and `kicad
 | Electron | Real app window, menus and a file picker. About 150 MB per install. Needs an installer, and code signing to avoid Windows SmartScreen warnings. |
 | pywebview (Python) | Native window using the system's WebView2. Probably 20–40 MB as one `.exe`. |
 | Tauri | Small app, but the backend is Rust: another rewrite. |
-| KiCad plugin | KiRI ships PCB editor plugins for KiCad 5 and 6. KiCad is replacing that plugin API, so this needs checking against KiCad 10 before relying on it. |
+| KiCad plugin | Upstream KiRI ships PCB editor plugins for KiCad 5 and 6 (removed from this fork). KiCad is replacing that plugin API, so this needs checking against KiCad 10 before relying on it. |
 
 ## What the port must keep
 
